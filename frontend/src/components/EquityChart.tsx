@@ -8,7 +8,6 @@ import { formatToEST } from '@/lib/timezone';
 import { getMarketHoursSegments, isRegularTradingHours } from '@/lib/marketHours';
 import { TradeOptionPrice, getOptionPriceColor, getOptionPriceSymbol } from '@/lib/optionPrices';
 import { RealTimeOptionPrice } from '@/lib/realTimeOptions';
-import ChartZoom, { useChartZoom } from './ChartZoom';
 
 interface EquityChartProps {
   data: ChartDataPoint[];
@@ -112,9 +111,6 @@ export default function EquityChart({
     }
   }, [data]);
 
-  // Set up zoom functionality
-  const { zoomedData, isZoomed, handleZoom, handleReset } = useChartZoom(chartData);
-
   return (
     <div>
       <div className="flex justify-between items-center mb-4">
@@ -134,17 +130,8 @@ export default function EquityChart({
         </div>
       </div>
       
-      {/* Zoom Controls */}
-      <ChartZoom 
-        data={chartData}
-        onZoom={handleZoom}
-        onReset={handleReset}
-        isZoomed={isZoomed}
-      />
-      
-      <div style={{ position: 'relative' }}>
-        <ResponsiveContainer width="100%" height={500}>
-          <ComposedChart data={zoomedData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+      <ResponsiveContainer width="100%" height={500}>
+        <ComposedChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.2} />
           
           {/* Shade non-market hours with darker background (only if showing non-market hours) */}
@@ -268,8 +255,7 @@ export default function EquityChart({
                 />
               )}
             </ComposedChart>
-        </ResponsiveContainer>
-      </div>
+      </ResponsiveContainer>
     </div>
   );
 }
