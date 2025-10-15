@@ -10,13 +10,19 @@ class SchwabConfig(BaseSettings):
     app_key: str = Field(..., description="Schwab API application key")
     app_secret: str = Field(..., description="Schwab API application secret")
     callback_url: str = Field(
-        default="https://localhost:8000/callback",
+        default="https://127.0.0.1:8182/",
         description="OAuth callback URL"
     )
     token_path: str = Field(
-        default=".schwab_tokens.json",
+        default="config/schwab_token.json",
         description="Path to store OAuth tokens"
     )
+    account_id: str = Field(default="", description="Schwab account ID")
+    base_url: str = Field(
+        default="https://api.schwab.com",
+        description="Schwab API base URL"
+    )
+    paper: bool = Field(default=True, description="Use paper trading")
     
     class Config:
         env_file = ".env"

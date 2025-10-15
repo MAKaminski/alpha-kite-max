@@ -28,6 +28,7 @@ htmlcov/
 
 # Schwab tokens
 .schwab_tokens.json
+backend/config/schwab_token.json
 
 # Testing
 coverage/
