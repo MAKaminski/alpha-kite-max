@@ -157,9 +157,10 @@ export default function Dashboard() {
   const fetchOptionPrices = async () => {
     try {
       const prices = await getTradeOptionPrices(ticker, selectedDate);
-      setOptionPrices(prices);
+      setOptionPrices(prices || []);
     } catch (error) {
       console.error('Error fetching option prices:', error);
+      setOptionPrices([]);
     }
   };
 

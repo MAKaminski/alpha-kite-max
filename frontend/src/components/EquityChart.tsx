@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceArea, Scatter, ComposedChart } from 'recharts';
 import { ChartDataPoint } from '../../../shared/types';
 import { Cross } from '@/lib/crossDetection';
@@ -31,27 +32,58 @@ export default function EquityChart({
 
   const formatPrice = (value: number) => `$${value.toFixed(2)}`;
 
-  // Filter data based on showNonMarketHours setting
-  const filteredData = showNonMarketHours 
-    ? data 
-    : data.filter(point => isRegularTradingHours(point.timestamp));
+  // Safely filter data based on showNonMarketHours setting
+  const filteredData = React.useMemo(() => {
+    if (!data || data.length === 0) return [];
+    
+    return showNonMarketHours 
+      ? data 
+      : data.filter(point => {
+          try {
+            return isRegularTradingHours(point.timestamp);
+          } catch (error) {
+            console.warn('Error checking market hours:', error);
+            return true; // Default to showing the point
+          }
+        });
+  }, [data, showNonMarketHours]);
 
   // Prepare chart data with option prices
-  const chartData = filteredData.map(point => {
-    const cross = crosses.find(c => c.timestamp === point.timestamp);
-    const optionPrice = optionPrices.find(op => op.timestamp === point.timestamp);
-    
-    return {
-      ...point,
-      crossMarker: cross ? cross.sma9 : null,  // Mark at SMA9/VWAP cross point
-      optionPrice: optionPrice ? optionPrice.price : null,
-      optionType: optionPrice ? optionPrice.option_type : null,
-      optionSymbol: optionPrice ? optionPrice.option_symbol : null
-    };
-  });
+  const chartData = React.useMemo(() => {
+    return filteredData.map(point => {
+      try {
+        const cross = (crosses || []).find(c => c.timestamp === point.timestamp);
+        const optionPrice = (optionPrices || []).find(op => op.timestamp === point.timestamp);
+        
+        return {
+          ...point,
+          crossMarker: cross ? cross.sma9 : null,  // Mark at SMA9/VWAP cross point
+          optionPrice: optionPrice ? optionPrice.price : null,
+          optionType: optionPrice ? optionPrice.option_type : null,
+          optionSymbol: optionPrice ? optionPrice.option_symbol : null
+        };
+      } catch (error) {
+        console.warn('Error processing chart point:', error);
+        return {
+          ...point,
+          crossMarker: null,
+          optionPrice: null,
+          optionType: null,
+          optionSymbol: null
+        };
+      }
+    });
+  }, [filteredData, crosses, optionPrices]);
 
   // Get market hours segments for background shading
-  const marketSegments = getMarketHoursSegments(data);
+  const marketSegments = React.useMemo(() => {
+    try {
+      return getMarketHoursSegments(data || []);
+    } catch (error) {
+      console.warn('Error getting market segments:', error);
+      return [];
+    }
+  }, [data]);
 
   // Set up zoom functionality
   const { zoomedData, isZoomed, handleZoom, handleReset } = useChartZoom(chartData);
@@ -163,43 +195,50 @@ export default function EquityChart({
               />
               
               {/* Option price markers */}
-              <Scatter
-                dataKey="optionPrice"
-                fill="#8884d8"
-                shape={(props: unknown) => {
-                  const { cx, cy, payload } = props as { cx: number; cy: number; payload: { optionPrice?: number; optionType?: string } };
-                  if (!payload?.optionPrice) {
-                    return <circle cx={0} cy={0} r={0} fill="transparent" />;
-                  }
-                  
-                  const color = getOptionPriceColor(payload.optionType as 'PUT' | 'CALL');
-                  const symbol = getOptionPriceSymbol(payload.optionType as 'PUT' | 'CALL');
-                  
-                  return (
-                    <g>
-                      <circle
-                        cx={cx}
-                        cy={cy}
-                        r={8}
-                        fill={color}
-                        stroke="#FFF"
-                        strokeWidth={2}
-                      />
-                      <text
-                        x={cx}
-                        y={cy + 4}
-                        textAnchor="middle"
-                        fill="#FFF"
-                        fontSize="10"
-                        fontWeight="bold"
-                      >
-                        {symbol}
-                      </text>
-                    </g>
-                  );
-                }}
-                name="Option Prices"
-              />
+              {optionPrices && optionPrices.length > 0 && (
+                <Scatter
+                  dataKey="optionPrice"
+                  fill="#8884d8"
+                  shape={(props: unknown) => {
+                    try {
+                      const { cx, cy, payload } = props as { cx: number; cy: number; payload: { optionPrice?: number; optionType?: string } };
+                      if (!payload?.optionPrice) {
+                        return <circle cx={0} cy={0} r={0} fill="transparent" />;
+                      }
+                      
+                      const color = getOptionPriceColor(payload.optionType as 'PUT' | 'CALL');
+                      const symbol = getOptionPriceSymbol(payload.optionType as 'PUT' | 'CALL');
+                      
+                      return (
+                        <g>
+                          <circle
+                            cx={cx}
+                            cy={cy}
+                            r={8}
+                            fill={color}
+                            stroke="#FFF"
+                            strokeWidth={2}
+                          />
+                          <text
+                            x={cx}
+                            y={cy + 4}
+                            textAnchor="middle"
+                            fill="#FFF"
+                            fontSize="10"
+                            fontWeight="bold"
+                          >
+                            {symbol}
+                          </text>
+                        </g>
+                      );
+                    } catch (error) {
+                      console.warn('Error rendering option marker:', error);
+                      return <circle cx={0} cy={0} r={0} fill="transparent" />;
+                    }
+                  }}
+                  name="Option Prices"
+                />
+              )}
             </ComposedChart>
       </ResponsiveContainer>
     </div>

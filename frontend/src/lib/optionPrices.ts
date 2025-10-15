@@ -23,6 +23,12 @@ export async function getTradeOptionPrices(ticker: string, date: Date): Promise<
   try {
     const dateStr = date.toISOString().split('T')[0];
     
+    // Check if supabase is configured
+    if (!supabase) {
+      console.warn('Supabase not configured, returning empty option prices');
+      return [];
+    }
+    
     // Get all trades for the day
     const { data: trades, error: tradesError } = await supabase
       .from('trades')
