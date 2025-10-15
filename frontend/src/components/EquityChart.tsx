@@ -4,7 +4,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { ChartDataPoint } from '../../../shared/types';
 import { Cross } from '@/lib/crossDetection';
 import { formatToEST } from '@/lib/timezone';
-import { getMarketHoursSegments } from '@/lib/marketHours';
+import { getMarketHoursSegments, isRegularTradingHours } from '@/lib/marketHours';
 
 interface EquityChartProps {
   data: ChartDataPoint[];
@@ -19,8 +19,11 @@ export default function EquityChart({ data, ticker, crosses }: EquityChartProps)
 
   const formatPrice = (value: number) => `$${value.toFixed(2)}`;
 
-  // Add cross marker data to chart data
-  const chartData = data.map(point => {
+  // Filter data to only show regular trading hours (9:30 AM - 4:00 PM EST)
+  const tradingHoursData = data.filter(point => isRegularTradingHours(point.timestamp));
+  
+  // Add cross marker data to chart data (only for trading hours data)
+  const chartData = tradingHoursData.map(point => {
     const isCross = crosses.some(c => c.timestamp === point.timestamp);
     return {
       ...point,

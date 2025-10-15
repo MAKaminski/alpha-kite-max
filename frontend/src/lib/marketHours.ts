@@ -84,3 +84,31 @@ export function getMarketHoursSegments(data: Array<{ timestamp: string }>): Mark
   return segments;
 }
 
+// Helper function to check if a timestamp is within regular trading hours (9:30 AM - 4:00 PM EST)
+export function isRegularTradingHours(timestamp: string | Date): boolean {
+  const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
+  const estDate = toZonedTime(date, EST_TIMEZONE);
+  
+  // Check if weekend
+  const dayOfWeek = estDate.getDay();
+  if (dayOfWeek === 0 || dayOfWeek === 6) {
+    return false; // Sunday or Saturday
+  }
+  
+  // Check if holiday
+  const dateStr = estDate.toISOString().split('T')[0];
+  if (MARKET_HOLIDAYS_2025.includes(dateStr)) {
+    return false;
+  }
+  
+  // Check if within regular trading hours (9:30 AM - 4:00 PM EST)
+  const hours = estDate.getHours();
+  const minutes = estDate.getMinutes();
+  const totalMinutes = hours * 60 + minutes;
+  
+  const marketOpen = 9 * 60 + 30;  // 9:30 AM
+  const marketClose = 16 * 60;     // 4:00 PM
+  
+  return totalMinutes >= marketOpen && totalMinutes < marketClose;
+}
+
