@@ -31,34 +31,59 @@ export default function Dashboard() {
     }
 
     try {
-      // Fetch all available equity data
-      const { data: equityData, error: equityError } = await supabase
-        .from('equity_data')
-        .select('*')
-        .eq('ticker', ticker)
-        .order('timestamp', { ascending: true })
-        .limit(15000); // ~1 month of minute data
+      // Fetch all available equity data (paginate if needed for large datasets)
+      let allEquityData: Array<Record<string, unknown>> = [];
+      let allIndicatorData: Array<Record<string, unknown>> = [];
+      let page = 0;
+      const pageSize = 1000;
+      
+      // Fetch equity data in pages
+      while (true) {
+        const { data: equityData, error: equityError } = await supabase
+          .from('equity_data')
+          .select('*')
+          .eq('ticker', ticker)
+          .order('timestamp', { ascending: true })
+          .range(page * pageSize, (page + 1) * pageSize - 1);
 
-      if (equityError) throw equityError;
+        if (equityError) throw equityError;
+        if (!equityData || equityData.length === 0) break;
+        
+        allEquityData = [...allEquityData, ...equityData];
+        if (equityData.length < pageSize) break;
+        page++;
+      }
+      
+      // Fetch indicator data in pages
+      page = 0;
+      while (true) {
+        const { data: indicatorData, error: indicatorError } = await supabase
+          .from('indicators')
+          .select('*')
+          .eq('ticker', ticker)
+          .order('timestamp', { ascending: true })
+          .range(page * pageSize, (page + 1) * pageSize - 1);
 
-      const { data: indicatorData, error: indicatorError } = await supabase
-        .from('indicators')
-        .select('*')
-        .eq('ticker', ticker)
-        .order('timestamp', { ascending: true })
-        .limit(15000);
+        if (indicatorError) throw indicatorError;
+        if (!indicatorData || indicatorData.length === 0) break;
+        
+        allIndicatorData = [...allIndicatorData, ...indicatorData];
+        if (indicatorData.length < pageSize) break;
+        page++;
+      }
 
-      if (indicatorError) throw indicatorError;
+      const equityData = allEquityData;
+      const indicatorData = allIndicatorData;
 
       // Merge data
       const mergedData: ChartDataPoint[] = (equityData || []).map((eq) => {
         const indicator = (indicatorData || []).find((ind) => ind.timestamp === eq.timestamp);
         return {
-          timestamp: eq.timestamp,
-          price: eq.price,
-          volume: eq.volume,
-          sma9: indicator?.sma9 || 0,
-          vwap: indicator?.vwap || 0,
+          timestamp: eq.timestamp as string,
+          price: eq.price as number,
+          volume: eq.volume as number,
+          sma9: (indicator?.sma9 as number) || 0,
+          vwap: (indicator?.vwap as number) || 0,
         };
       });
 

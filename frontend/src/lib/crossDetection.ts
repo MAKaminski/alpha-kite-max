@@ -10,6 +10,7 @@ export interface Cross {
 
 export function detectCrosses(data: ChartDataPoint[]): Cross[] {
   const crosses: Cross[] = [];
+  let lastDirection: 'up' | 'down' | null = null;
   
   for (let i = 1; i < data.length; i++) {
     const prev = data[i - 1];
@@ -21,13 +22,19 @@ export function detectCrosses(data: ChartDataPoint[]): Cross[] {
     
     // Cross occurred if signs differ
     if (prevDiff * currDiff < 0) {
-      crosses.push({
-        timestamp: curr.timestamp,
-        price: curr.price,
-        sma9: curr.sma9,
-        vwap: curr.vwap,
-        direction: currDiff > 0 ? 'up' : 'down'
-      });
+      const direction = currDiff > 0 ? 'up' : 'down';
+      
+      // Only add if direction changed from last cross (prevent consecutive same-direction crosses)
+      if (lastDirection === null || lastDirection !== direction) {
+        crosses.push({
+          timestamp: curr.timestamp,
+          price: curr.price,
+          sma9: curr.sma9,
+          vwap: curr.vwap,
+          direction
+        });
+        lastDirection = direction;
+      }
     }
   }
   

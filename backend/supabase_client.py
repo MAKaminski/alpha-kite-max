@@ -118,18 +118,37 @@ class SupabaseClient:
         logger.info("fetching_equity_data", ticker=ticker, limit=limit)
         
         try:
-            response = self.client.table("equity_data")\
-                .select("*")\
-                .eq("ticker", ticker)\
-                .order("timestamp", desc=True)\
-                .limit(limit)\
-                .execute()
+            all_data = []
+            page_size = 1000
+            page = 0
             
-            if not response.data:
+            # Paginate through all data
+            while len(all_data) < limit:
+                response = self.client.table("equity_data")\
+                    .select("*")\
+                    .eq("ticker", ticker)\
+                    .order("timestamp", desc=False)\
+                    .range(page * page_size, (page + 1) * page_size - 1)\
+                    .execute()
+                
+                if not response.data or len(response.data) == 0:
+                    break
+                
+                all_data.extend(response.data)
+                
+                if len(response.data) < page_size:
+                    break
+                    
+                page += 1
+            
+            # Limit to requested number
+            all_data = all_data[:limit]
+            
+            if not all_data:
                 logger.warning("no_equity_data_found", ticker=ticker)
                 return pd.DataFrame()
             
-            df = pd.DataFrame(response.data)
+            df = pd.DataFrame(all_data)
             df["timestamp"] = pd.to_datetime(df["timestamp"])
             df = df.sort_values("timestamp")
             

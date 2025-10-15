@@ -150,14 +150,23 @@ class EquityDownloader:
         
         # Work on a copy to avoid modifying original DataFrame
         temp_df = df.copy()
+        temp_df['timestamp'] = pd.to_datetime(temp_df['timestamp'])
         
         # Calculate SMA9 (9-period Simple Moving Average)
         temp_df["sma9"] = temp_df["price"].rolling(window=9, min_periods=1).mean()
         
-        # Calculate VWAP (Volume Weighted Average Price)
-        # VWAP is typically calculated on a session basis, but here we'll use cumulative
-        # For proper session VWAP, you'd reset at market open
-        temp_df["vwap"] = (temp_df["price"] * temp_df["volume"]).cumsum() / temp_df["volume"].cumsum()
+        # Calculate Session VWAP (resets each trading day at 9:30 AM EST)
+        # Convert to EST and identify trading sessions
+        temp_df['est_time'] = temp_df['timestamp'].dt.tz_convert('America/New_York')
+        temp_df['session_date'] = temp_df['est_time'].dt.date
+        
+        # Calculate VWAP within each session
+        def calc_session_vwap(group):
+            group = group.sort_values('timestamp')
+            group['vwap'] = (group['price'] * group['volume']).cumsum() / group['volume'].cumsum()
+            return group
+        
+        temp_df = temp_df.groupby('session_date', group_keys=False).apply(calc_session_vwap)
         
         # Create indicators DataFrame with only required columns
         indicators_df = temp_df[["ticker", "timestamp", "sma9", "vwap"]].copy()
