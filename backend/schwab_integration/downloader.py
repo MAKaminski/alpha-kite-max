@@ -118,16 +118,19 @@ class EquityDownloader:
         
         logger.info("calculating_indicators", rows=len(df))
         
+        # Work on a copy to avoid modifying original DataFrame
+        temp_df = df.copy()
+        
         # Calculate SMA9 (9-period Simple Moving Average)
-        df["sma9"] = df["price"].rolling(window=9, min_periods=1).mean()
+        temp_df["sma9"] = temp_df["price"].rolling(window=9, min_periods=1).mean()
         
         # Calculate VWAP (Volume Weighted Average Price)
         # VWAP is typically calculated on a session basis, but here we'll use cumulative
         # For proper session VWAP, you'd reset at market open
-        df["vwap"] = (df["price"] * df["volume"]).cumsum() / df["volume"].cumsum()
+        temp_df["vwap"] = (temp_df["price"] * temp_df["volume"]).cumsum() / temp_df["volume"].cumsum()
         
-        # Create indicators DataFrame
-        indicators_df = df[["ticker", "timestamp", "sma9", "vwap"]].copy()
+        # Create indicators DataFrame with only required columns
+        indicators_df = temp_df[["ticker", "timestamp", "sma9", "vwap"]].copy()
         
         # Round to 2 decimal places
         indicators_df["sma9"] = indicators_df["sma9"].round(2)
