@@ -103,11 +103,31 @@ class SchwabClient:
             frequency=f"{frequency}{frequency_type}"
         )
         
-        # Use simplified API - schwab-py handles the enums internally
+        # Map period to appropriate Schwab enum
+        if period_type == "day":
+            if period == 1:
+                period_enum = client.Client.PriceHistory.Period.ONE_DAY
+            elif period == 2:
+                period_enum = client.Client.PriceHistory.Period.TWO_DAYS
+            elif period == 3:
+                period_enum = client.Client.PriceHistory.Period.THREE_DAYS
+            elif period == 5:
+                period_enum = client.Client.PriceHistory.Period.FIVE_DAYS
+            elif period == 10:
+                period_enum = client.Client.PriceHistory.Period.TEN_DAYS
+            else:
+                # For periods > 10 days, use month
+                period_type = "month"
+                period = 1
+                period_enum = client.Client.PriceHistory.Period.ONE_MONTH
+        
+        if period_type == "month":
+            period_enum = client.Client.PriceHistory.Period.ONE_MONTH
+        
         response = client_instance.get_price_history(
             symbol,
-            period_type=client.Client.PriceHistory.PeriodType.DAY,
-            period=client.Client.PriceHistory.Period.ONE_DAY if period == 1 else client.Client.PriceHistory.Period.FIVE_DAY,
+            period_type=client.Client.PriceHistory.PeriodType.DAY if period_type == "day" else client.Client.PriceHistory.PeriodType.MONTH,
+            period=period_enum,
             frequency_type=client.Client.PriceHistory.FrequencyType.MINUTE,
             frequency=client.Client.PriceHistory.Frequency.EVERY_MINUTE
         )

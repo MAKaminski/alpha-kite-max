@@ -2,19 +2,30 @@
 
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { ChartDataPoint } from '../../../shared/types';
+import { Cross } from '@/lib/crossDetection';
+import { formatToEST } from '@/lib/timezone';
 
 interface EquityChartProps {
   data: ChartDataPoint[];
   ticker: string;
+  crosses: Cross[];
 }
 
-export default function EquityChart({ data, ticker }: EquityChartProps) {
+export default function EquityChart({ data, ticker, crosses }: EquityChartProps) {
   const formatTime = (timestamp: string) => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    return formatToEST(timestamp, 'h:mm a');
   };
 
   const formatPrice = (value: number) => `$${value.toFixed(2)}`;
+
+  // Add cross marker data to chart data
+  const chartData = data.map(point => {
+    const isCross = crosses.some(c => c.timestamp === point.timestamp);
+    return {
+      ...point,
+      crossMarker: isCross ? point.price : null
+    };
+  });
 
   return (
     <div>
@@ -22,7 +33,7 @@ export default function EquityChart({ data, ticker }: EquityChartProps) {
         Chart | SMA9, Session VWAP
       </h2>
       <ResponsiveContainer width="100%" height={500}>
-        <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+        <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.2} />
           <XAxis
             dataKey="timestamp"
@@ -35,6 +46,7 @@ export default function EquityChart({ data, ticker }: EquityChartProps) {
             stroke="#6B7280"
             style={{ fontSize: '12px' }}
             domain={['auto', 'auto']}
+            label={{ value: 'Price (EST)', angle: -90, position: 'insideLeft', style: { fill: '#6B7280' } }}
           />
           <Tooltip
             contentStyle={{
@@ -43,7 +55,7 @@ export default function EquityChart({ data, ticker }: EquityChartProps) {
               borderRadius: '8px',
               color: '#F9FAFB',
             }}
-            labelFormatter={(label) => formatTime(label)}
+            labelFormatter={(label) => `${formatToEST(label, 'h:mm:ss a')} EST`}
             formatter={(value: number) => [`$${value.toFixed(2)}`, '']}
           />
           <Legend
@@ -75,6 +87,15 @@ export default function EquityChart({ data, ticker }: EquityChartProps) {
             dot={false}
             name="Session VWAP"
             strokeDasharray="5 5"
+          />
+          {/* Cross markers as red circles */}
+          <Line
+            type="monotone"
+            dataKey="crossMarker"
+            stroke="none"
+            dot={{ fill: '#EF4444', r: 6, strokeWidth: 2, stroke: '#FFF' }}
+            name="Crosses"
+            isAnimationActive={false}
           />
         </LineChart>
       </ResponsiveContainer>

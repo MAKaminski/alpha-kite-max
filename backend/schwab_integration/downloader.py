@@ -40,17 +40,47 @@ class EquityDownloader:
         """
         logger.info("downloading_minute_data", ticker=ticker, days=days)
         
-        # Fetch price history from Schwab
-        data = self.client.get_price_history(
-            symbol=ticker,
-            period_type="day",
-            period=days,
-            frequency_type="minute",
-            frequency=1
-        )
-        
-        # Transform to DataFrame
-        df = self._transform_to_dataframe(ticker, data)
+        # Schwab API supports max 10 days of minute data at once
+        # For > 10 days, download in chunks
+        if days <= 10:
+            data = self.client.get_price_history(
+                symbol=ticker,
+                period_type="day",
+                period=days,
+                frequency_type="minute",
+                frequency=1
+            )
+            df = self._transform_to_dataframe(ticker, data)
+        else:
+            # Download in 10-day chunks
+            all_dfs = []
+            remaining_days = days
+            
+            while remaining_days > 0:
+                chunk_days = min(10, remaining_days)
+                logger.info("downloading_chunk", chunk_days=chunk_days, remaining=remaining_days)
+                
+                data = self.client.get_price_history(
+                    symbol=ticker,
+                    period_type="day",
+                    period=chunk_days,
+                    frequency_type="minute",
+                    frequency=1
+                )
+                
+                chunk_df = self._transform_to_dataframe(ticker, data)
+                if not chunk_df.empty:
+                    all_dfs.append(chunk_df)
+                
+                remaining_days -= 10
+            
+            # Combine all chunks
+            if all_dfs:
+                df = pd.concat(all_dfs, ignore_index=True)
+                df = df.drop_duplicates(subset=["ticker", "timestamp"], keep="last")
+                df = df.sort_values("timestamp")
+            else:
+                df = pd.DataFrame(columns=["ticker", "timestamp", "price", "volume"])
         
         logger.info(
             "minute_data_downloaded",

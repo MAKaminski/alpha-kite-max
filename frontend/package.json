@@ -10,9 +10,13 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.75.0",
+    "@types/react-datepicker": "^6.2.0",
+    "date-fns": "^4.1.0",
+    "date-fns-tz": "^3.2.0",
     "lightweight-charts": "^5.0.9",
     "next": "15.5.5",
     "react": "19.1.0",
+    "react-datepicker": "^8.7.0",
     "react-dom": "19.1.0",
     "recharts": "^3.2.1"
   },
