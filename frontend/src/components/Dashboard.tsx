@@ -7,6 +7,7 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { ChartDataPoint } from '../../../shared/types';
 import { detectCrosses, filterCrossesByDate, Cross } from '@/lib/crossDetection';
 import { formatToEST } from '@/lib/timezone';
+import { getTradeOptionPrices, TradeOptionPrice } from '@/lib/optionPrices';
 import EquityChart from './EquityChart';
 import ESTClock from './ESTClock';
 import SignalsDashboard from './SignalsDashboard';
@@ -18,6 +19,8 @@ export default function Dashboard() {
   const [displayData, setDisplayData] = useState<ChartDataPoint[]>([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [todayCrosses, setTodayCrosses] = useState<Cross[]>([]);
+  const [optionPrices, setOptionPrices] = useState<TradeOptionPrice[]>([]);
+  const [showNonMarketHours, setShowNonMarketHours] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -151,11 +154,27 @@ export default function Dashboard() {
     }
   };
 
+  const fetchOptionPrices = async () => {
+    try {
+      const prices = await getTradeOptionPrices(ticker, selectedDate);
+      setOptionPrices(prices);
+    } catch (error) {
+      console.error('Error fetching option prices:', error);
+    }
+  };
+
   // Fetch data when ticker changes
   useEffect(() => {
     fetchData();
+    fetchOptionPrices();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticker]);
+
+  // Fetch option prices when date changes
+  useEffect(() => {
+    fetchOptionPrices();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate, ticker]);
 
   // Real-time update every minute
   useEffect(() => {
@@ -300,7 +319,14 @@ export default function Dashboard() {
           )}
 
           {!loading && !error && displayData.length > 0 && (
-            <EquityChart data={displayData} ticker={ticker} crosses={todayCrosses} />
+            <EquityChart 
+              data={displayData} 
+              ticker={ticker} 
+              crosses={todayCrosses}
+              optionPrices={optionPrices}
+              showNonMarketHours={showNonMarketHours}
+              onToggleNonMarketHours={setShowNonMarketHours}
+            />
           )}
 
           {!loading && !error && displayData.length === 0 && (
