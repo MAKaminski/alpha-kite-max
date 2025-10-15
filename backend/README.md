@@ -4,12 +4,20 @@ Python backend for downloading equity data from Schwab API and loading into Supa
 
 ## Setup
 
+### Prerequisites
+
+- **Python 3.10+** required (schwab-py dependency)
+- Check your version: `python3 --version`
+- If needed, use: `/opt/homebrew/bin/python3.10` (macOS Homebrew)
+
 ### 1. Install Dependencies
 
 ```bash
 cd backend
-python3 -m venv venv
+# Use Python 3.10 or higher
+python3.10 -m venv venv  # Or python3 if default is 3.10+
 source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
