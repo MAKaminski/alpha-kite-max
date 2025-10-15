@@ -198,6 +198,187 @@ class SupabaseClient:
             logger.error("indicators_fetch_failed", error=str(e))
             raise
     
+    # Trading Operations
+    
+    def get_open_positions(self, ticker: str) -> List[Position]:
+        """Get all open positions for a ticker."""
+        try:
+            response = self.client.table("positions")\
+                .select("*")\
+                .eq("ticker", ticker)\
+                .eq("status", "OPEN")\
+                .execute()
+            
+            positions = []
+            for row in response.data:
+                positions.append(Position(**row))
+            
+            logger.info("open_positions_fetched", ticker=ticker, count=len(positions))
+            return positions
+            
+        except Exception as e:
+            logger.error("open_positions_fetch_failed", error=str(e))
+            return []
+    
+    def create_position(self, position: Position) -> str:
+        """Create a new position."""
+        try:
+            position_data = position.model_dump(exclude={'id', 'created_at', 'updated_at'})
+            response = self.client.table("positions")\
+                .insert(position_data)\
+                .execute()
+            
+            if response.data:
+                position_id = response.data[0]['id']
+                logger.info("position_created", position_id=position_id, ticker=position.ticker)
+                return position_id
+            
+        except Exception as e:
+            logger.error("position_creation_failed", error=str(e))
+            raise
+    
+    def update_position(self, position: Position) -> bool:
+        """Update an existing position."""
+        try:
+            if not position.id:
+                raise ValueError("Position ID is required for updates")
+            
+            update_data = position.model_dump(exclude={'id', 'created_at'}, exclude_none=True)
+            response = self.client.table("positions")\
+                .update(update_data)\
+                .eq("id", position.id)\
+                .execute()
+            
+            logger.info("position_updated", position_id=position.id)
+            return True
+            
+        except Exception as e:
+            logger.error("position_update_failed", error=str(e))
+            return False
+    
+    def create_trade(self, trade: Trade) -> str:
+        """Create a new trade record."""
+        try:
+            trade_data = trade.model_dump(exclude={'id', 'created_at'})
+            response = self.client.table("trades")\
+                .insert(trade_data)\
+                .execute()
+            
+            if response.data:
+                trade_id = response.data[0]['id']
+                logger.info("trade_created", trade_id=trade_id, ticker=trade.ticker)
+                return trade_id
+            
+        except Exception as e:
+            logger.error("trade_creation_failed", error=str(e))
+            raise
+    
+    def create_trading_signal(self, signal: TradingSignal) -> str:
+        """Create a new trading signal record."""
+        try:
+            signal_data = signal.model_dump(exclude={'id', 'created_at'})
+            response = self.client.table("trading_signals")\
+                .insert(signal_data)\
+                .execute()
+            
+            if response.data:
+                signal_id = response.data[0]['id']
+                logger.info("trading_signal_created", signal_id=signal_id, ticker=signal.ticker)
+                return signal_id
+            
+        except Exception as e:
+            logger.error("trading_signal_creation_failed", error=str(e))
+            raise
+    
+    def get_daily_pnl(self, ticker: str, trade_date: date) -> Optional[DailyPnL]:
+        """Get daily P&L for a specific date."""
+        try:
+            response = self.client.table("daily_pnl")\
+                .select("*")\
+                .eq("ticker", ticker)\
+                .eq("trade_date", trade_date.isoformat())\
+                .execute()
+            
+            if response.data:
+                return DailyPnL(**response.data[0])
+            
+            return None
+            
+        except Exception as e:
+            logger.error("daily_pnl_fetch_failed", error=str(e))
+            return None
+    
+    def update_daily_pnl(self, daily_pnl: DailyPnL) -> bool:
+        """Update or create daily P&L record."""
+        try:
+            pnl_data = daily_pnl.model_dump(exclude={'id', 'created_at'}, exclude_none=True)
+            
+            if daily_pnl.id:
+                # Update existing record
+                response = self.client.table("daily_pnl")\
+                    .update(pnl_data)\
+                    .eq("id", daily_pnl.id)\
+                    .execute()
+            else:
+                # Create new record
+                response = self.client.table("daily_pnl")\
+                    .insert(pnl_data)\
+                    .execute()
+            
+            logger.info("daily_pnl_updated", ticker=daily_pnl.ticker, date=daily_pnl.trade_date)
+            return True
+            
+        except Exception as e:
+            logger.error("daily_pnl_update_failed", error=str(e))
+            return False
+    
+    def get_trading_summary(self, ticker: str, trade_date: date) -> dict:
+        """Get comprehensive trading summary for dashboard."""
+        try:
+            # Get daily P&L
+            daily_pnl = self.get_daily_pnl(ticker, trade_date)
+            
+            # Get open positions
+            open_positions = self.get_open_positions(ticker)
+            
+            # Get recent trades (last 10)
+            trades_response = self.client.table("trades")\
+                .select("*")\
+                .eq("ticker", ticker)\
+                .order("trade_timestamp", desc=True)\
+                .limit(10)\
+                .execute()
+            
+            recent_trades = [Trade(**row) for row in trades_response.data]
+            
+            # Get recent signals (last 10)
+            signals_response = self.client.table("trading_signals")\
+                .select("*")\
+                .eq("ticker", ticker)\
+                .order("signal_timestamp", desc=True)\
+                .limit(10)\
+                .execute()
+            
+            recent_signals = [TradingSignal(**row) for row in signals_response.data]
+            
+            # Calculate position summary
+            total_unrealized_pnl = sum(pos.unrealized_pnl or 0 for pos in open_positions)
+            
+            return {
+                'ticker': ticker,
+                'date': trade_date,
+                'daily_pnl': daily_pnl,
+                'open_positions': open_positions,
+                'recent_trades': recent_trades,
+                'recent_signals': recent_signals,
+                'total_unrealized_pnl': total_unrealized_pnl,
+                'position_count': len(open_positions)
+            }
+            
+        except Exception as e:
+            logger.error("trading_summary_fetch_failed", error=str(e))
+            return {}
+    
     def test_connection(self) -> bool:
         """Test connection to Supabase.
         
