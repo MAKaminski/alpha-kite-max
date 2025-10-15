@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from unittest.mock import Mock, patch, MagicMock
 
 from supabase_client import SupabaseClient
-from schwab.config import SupabaseConfig
+from schwab_integration.config import SupabaseConfig
 
 
 @pytest.fixture

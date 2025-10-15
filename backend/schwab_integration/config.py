@@ -21,6 +21,7 @@ class SchwabConfig(BaseSettings):
     class Config:
         env_file = ".env"
         env_prefix = "SCHWAB_"
+        extra = "ignore"  # Ignore extra env variables
 
 
 class SupabaseConfig(BaseSettings):
@@ -32,6 +33,7 @@ class SupabaseConfig(BaseSettings):
     class Config:
         env_file = ".env"
         env_prefix = "SUPABASE_"
+        extra = "ignore"  # Ignore extra env variables
 
 
 class AppConfig(BaseSettings):
@@ -45,4 +47,5 @@ class AppConfig(BaseSettings):
     
     class Config:
         env_file = ".env"
+        extra = "ignore"  # Ignore extra env variables
 

@@ -5,8 +5,8 @@ import pandas as pd
 from datetime import datetime
 from unittest.mock import Mock, patch
 
-from schwab.downloader import EquityDownloader
-from schwab.client import SchwabClient
+from schwab_integration.downloader import EquityDownloader
+from schwab_integration.client import SchwabClient
 
 
 @pytest.fixture

@@ -5,7 +5,7 @@ import pandas as pd
 import structlog
 from supabase import create_client, Client
 
-from schwab.config import SupabaseConfig
+from schwab_integration.config import SupabaseConfig
 
 
 logger = structlog.get_logger()

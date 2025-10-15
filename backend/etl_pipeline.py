@@ -3,9 +3,9 @@
 from typing import Optional
 import structlog
 
-from schwab.client import SchwabClient
-from schwab.downloader import EquityDownloader
-from schwab.config import SchwabConfig, SupabaseConfig, AppConfig
+from schwab_integration.client import SchwabClient
+from schwab_integration.downloader import EquityDownloader
+from schwab_integration.config import SchwabConfig, SupabaseConfig, AppConfig
 from supabase_client import SupabaseClient
 
 
