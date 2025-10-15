@@ -128,7 +128,7 @@ class TradingEngine:
         logger.info("selling_puts", ticker=ticker, current_price=current_price)
         
         # Find nearest put strike (slightly below current price)
-        strike_price = self._find_nearest_put_strike(current_price)
+        strike_price = self._find_nearest_put_strike(ticker, current_price)
         
         # Get option quote
         option_symbol = self._build_option_symbol(ticker, strike_price, 'PUT')
@@ -190,7 +190,7 @@ class TradingEngine:
         logger.info("selling_calls", ticker=ticker, current_price=current_price)
         
         # Find nearest call strike (slightly above current price)
-        strike_price = self._find_nearest_call_strike(current_price)
+        strike_price = self._find_nearest_call_strike(ticker, current_price)
         
         # Get option quote
         option_symbol = self._build_option_symbol(ticker, strike_price, 'CALL')
@@ -293,15 +293,71 @@ class TradingEngine:
             
         return True
     
-    def _find_nearest_put_strike(self, current_price: float) -> float:
-        """Find nearest put strike below current price."""
-        # Round down to nearest $1 increment
-        return float(int(current_price))
+    def _find_nearest_put_strike(self, ticker: str, current_price: float) -> Optional[float]:
+        """Find nearest put strike below current price with good liquidity."""
+        try:
+            # Get option chains for puts
+            option_chains = self.schwab_client.get_option_chains(ticker, "PUT")
+            
+            if not option_chains or 'callExpDateMap' not in option_chains:
+                # Fallback to simple calculation
+                return float(int(current_price))
+            
+            # Find puts with strikes below current price and good liquidity
+            best_strike = None
+            best_liquidity = 0
+            
+            for exp_date, strikes in option_chains.items():
+                for strike, contracts in strikes.items():
+                    strike_price = float(strike)
+                    if strike_price < current_price:
+                        # Check liquidity (volume + open interest)
+                        total_liquidity = 0
+                        for contract in contracts:
+                            total_liquidity += contract.get('totalVolume', 0) + contract.get('openInterest', 0)
+                        
+                        if total_liquidity > best_liquidity:
+                            best_liquidity = total_liquidity
+                            best_strike = strike_price
+            
+            return best_strike if best_strike else float(int(current_price))
+            
+        except Exception as e:
+            logger.error("put_strike_search_failed", error=str(e))
+            return float(int(current_price))
     
-    def _find_nearest_call_strike(self, current_price: float) -> float:
-        """Find nearest call strike above current price."""
-        # Round up to nearest $1 increment
-        return float(int(current_price) + 1)
+    def _find_nearest_call_strike(self, ticker: str, current_price: float) -> Optional[float]:
+        """Find nearest call strike above current price with good liquidity."""
+        try:
+            # Get option chains for calls
+            option_chains = self.schwab_client.get_option_chains(ticker, "CALL")
+            
+            if not option_chains or 'callExpDateMap' not in option_chains:
+                # Fallback to simple calculation
+                return float(int(current_price) + 1)
+            
+            # Find calls with strikes above current price and good liquidity
+            best_strike = None
+            best_liquidity = 0
+            
+            for exp_date, strikes in option_chains.items():
+                for strike, contracts in strikes.items():
+                    strike_price = float(strike)
+                    if strike_price > current_price:
+                        # Check liquidity (volume + open interest)
+                        total_liquidity = 0
+                        for contract in contracts:
+                            total_liquidity += contract.get('totalVolume', 0) + contract.get('openInterest', 0)
+                        
+                        if total_liquidity > best_liquidity:
+                            best_liquidity = total_liquidity
+                            best_strike = strike_price
+            
+            return best_strike if best_strike else float(int(current_price) + 1)
+            
+        except Exception as e:
+            logger.error("call_strike_search_failed", error=str(e))
+            return float(int(current_price) + 1)
     
     def _build_option_symbol(self, ticker: str, strike: float, option_type: str) -> str:
         """Build option symbol for Schwab API."""
@@ -324,15 +380,25 @@ class TradingEngine:
     def _get_option_quote(self, option_symbol: str) -> Optional[Dict[str, float]]:
         """Get option quote from Schwab API."""
         try:
-            # This would call Schwab API for option quotes
-            # For now, return mock data
-            return {
-                'bid': 0.50,
-                'ask': 0.55,
-                'last': 0.52
-            }
+            quote_data = self.schwab_client.get_option_quote(option_symbol)
+            
+            # Extract quote information from Schwab response
+            if quote_data and 'quotes' in quote_data:
+                quote = quote_data['quotes'][0] if quote_data['quotes'] else None
+                if quote:
+                    return {
+                        'bid': float(quote.get('bid', 0)),
+                        'ask': float(quote.get('ask', 0)),
+                        'last': float(quote.get('last', 0)),
+                        'volume': int(quote.get('totalVolume', 0)),
+                        'openInterest': int(quote.get('openInterest', 0))
+                    }
+            
+            logger.warning("no_quote_data", option_symbol=option_symbol)
+            return None
+            
         except Exception as e:
-            logger.error("option_quote_error", error=str(e))
+            logger.error("option_quote_error", error=str(e), option_symbol=option_symbol)
             return None
     
     def check_profit_loss_targets(self, ticker: str) -> List[Dict[str, Any]]:

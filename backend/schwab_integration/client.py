@@ -71,6 +71,61 @@ class SchwabClient:
             logger.error("schwab_authentication_failed", error=str(e))
             raise
     
+    def get_option_chains(self, symbol: str, contract_type: str = "ALL") -> dict:
+        """Fetch option chains for a symbol."""
+        logger.info(
+            "fetching_option_chains",
+            symbol=symbol,
+            contract_type=contract_type
+        )
+
+        client_instance = self.authenticate()
+        
+        # Map contract type to Schwab enum
+        contract_enum = None
+        if contract_type == "CALL":
+            contract_enum = client.Client.Options.ContractType.CALL
+        elif contract_type == "PUT":
+            contract_enum = client.Client.Options.ContractType.PUT
+        else:  # ALL
+            contract_enum = client.Client.Options.ContractType.ALL
+
+        response = client_instance.get_option_chains(
+            symbol=symbol,
+            contract_type=contract_enum,
+            include_quotes=True
+        )
+
+        if response.status_code != 200:
+            logger.error(
+                "option_chains_fetch_failed",
+                status_code=response.status_code,
+                response=response.text
+            )
+            response.raise_for_status()
+
+        logger.info("option_chains_fetched", symbol=symbol)
+        return response.json()
+
+    def get_option_quote(self, symbol: str) -> dict:
+        """Get option quote for a specific option symbol."""
+        logger.info("fetching_option_quote", symbol=symbol)
+
+        client_instance = self.authenticate()
+        
+        response = client_instance.get_option_quotes([symbol])
+
+        if response.status_code != 200:
+            logger.error(
+                "option_quote_fetch_failed",
+                status_code=response.status_code,
+                response=response.text
+            )
+            response.raise_for_status()
+
+        logger.info("option_quote_fetched", symbol=symbol)
+        return response.json()
+    
     def get_price_history(
         self,
         symbol: str,

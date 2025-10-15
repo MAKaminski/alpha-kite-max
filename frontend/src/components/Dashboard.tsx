@@ -10,6 +10,7 @@ import { formatToEST } from '@/lib/timezone';
 import EquityChart from './EquityChart';
 import ESTClock from './ESTClock';
 import SignalsDashboard from './SignalsDashboard';
+import TradingDashboard from './TradingDashboard';
 
 export default function Dashboard() {
   const [ticker, setTicker] = useState('QQQ');
@@ -310,6 +311,11 @@ export default function Dashboard() {
             </div>
           )}
         </div>
+
+        {/* Trading Dashboard */}
+        {!loading && !error && (
+          <TradingDashboard ticker={ticker} selectedDate={selectedDate} />
+        )}
 
         {/* Signals Dashboard */}
         {!loading && !error && (
