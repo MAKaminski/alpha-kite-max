@@ -48,7 +48,8 @@ class SchwabClient:
                 logger.info("loading_existing_tokens", path=self.config.token_path)
                 self._client = auth.client_from_token_file(
                     self.config.token_path,
-                    self.config.app_key
+                    self.config.app_key,
+                    self.config.app_secret
                 )
             else:
                 # First time authentication - requires manual callback
@@ -102,12 +103,13 @@ class SchwabClient:
             frequency=f"{frequency}{frequency_type}"
         )
         
+        # Use simplified API - schwab-py handles the enums internally
         response = client_instance.get_price_history(
             symbol,
-            period_type=getattr(client.Client.PriceHistory.PeriodType, period_type.upper()),
-            period=getattr(client.Client.PriceHistory.Period, f"{period_type.upper()}_{period}"),
-            frequency_type=getattr(client.Client.PriceHistory.FrequencyType, frequency_type.upper()),
-            frequency=getattr(client.Client.PriceHistory.Frequency, f"EVERY_{frequency}_MINUTE" if frequency_type == "minute" else frequency_type.upper())
+            period_type=client.Client.PriceHistory.PeriodType.DAY,
+            period=client.Client.PriceHistory.Period.ONE_DAY if period == 1 else client.Client.PriceHistory.Period.FIVE_DAY,
+            frequency_type=client.Client.PriceHistory.FrequencyType.MINUTE,
+            frequency=client.Client.PriceHistory.Frequency.EVERY_MINUTE
         )
         
         if response.status_code != 200:
