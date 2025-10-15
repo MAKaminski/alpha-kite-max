@@ -19,15 +19,12 @@ export default function EquityChart({ data, ticker, crosses }: EquityChartProps)
 
   const formatPrice = (value: number) => `$${value.toFixed(2)}`;
 
-  // Filter data to only show regular trading hours (9:30 AM - 4:00 PM EST)
-  const tradingHoursData = data.filter(point => isRegularTradingHours(point.timestamp));
-  
-  // Add cross marker data to chart data (only for trading hours data)
-  const chartData = tradingHoursData.map(point => {
-    const isCross = crosses.some(c => c.timestamp === point.timestamp);
+  // Show full day data, not filtered
+  const chartData = data.map(point => {
+    const cross = crosses.find(c => c.timestamp === point.timestamp);
     return {
       ...point,
-      crossMarker: isCross ? point.price : null
+      crossMarker: cross ? cross.sma9 : null  // Mark at SMA9/VWAP cross point, not price
     };
   });
 
@@ -49,8 +46,8 @@ export default function EquityChart({ data, ticker, crosses }: EquityChartProps)
               key={`non-market-${idx}`}
               x1={segment.start}
               x2={segment.end}
-              fill="#6B7280"
-              fillOpacity={0.1}
+              fill="#374151"
+              fillOpacity={0.15}
               ifOverflow="extendDomain"
             />
           ))}

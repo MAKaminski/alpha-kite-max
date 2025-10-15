@@ -55,7 +55,7 @@ export function getMarketHoursSegments(data: Array<{ timestamp: string }>): Mark
   let currentSegment: MarketHoursSegment | null = null;
   
   for (const point of data) {
-    const inMarketHours = isMarketHours(point.timestamp);
+    const inMarketHours = isRegularTradingHours(point.timestamp);
     
     if (!currentSegment) {
       currentSegment = {
