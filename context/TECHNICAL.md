@@ -18,8 +18,6 @@ BACKEND: Python
 2) Download Option
 3) ETL Updates
 
-
-
 # Infra: Vercel
 
 - UI
@@ -48,3 +46,7 @@ Schwab (x2)
 * 5 GB egress <- Monitor
 * 5 GB cached egress <- Monitor
 * 1 GB file storage <- Monitor
+
+# FEATURE BASED DEPLOYMENT
+
+Prior to updating any code, a feature or issue should be created in github properly referencing what we are updating.  Any code updates completed need to be submitted as part of the issue/feature pull request.
