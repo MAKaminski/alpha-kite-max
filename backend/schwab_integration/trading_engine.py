@@ -293,38 +293,71 @@ class TradingEngine:
             
         return True
     
-    def _find_nearest_put_strike(self, ticker: str, current_price: float) -> Optional[float]:
-        """Find nearest put strike below current price with good liquidity."""
+    def get_0dte_option_chain(self, ticker: str, current_price: float) -> Dict[str, Any]:
+        """Get 0DTE option chain for nearest strikes."""
         try:
-            # Get option chains for puts
-            option_chains = self.schwab_client.get_option_chains(ticker, "PUT")
+            # Get option chains for today's expiration (0DTE)
+            option_chains = self.schwab_client.get_option_chains(ticker, "ALL")
             
-            if not option_chains or 'callExpDateMap' not in option_chains:
-                # Fallback to simple calculation
-                return float(int(current_price))
+            if not option_chains:
+                logger.warning("no_option_chains", ticker=ticker)
+                return {}
             
-            # Find puts with strikes below current price and good liquidity
-            best_strike = None
-            best_liquidity = 0
+            # Find today's expiration date
+            today = datetime.now().date()
+            today_str = today.strftime("%Y-%m-%d")
             
-            for exp_date, strikes in option_chains.items():
-                for strike, contracts in strikes.items():
-                    strike_price = float(strike)
-                    if strike_price < current_price:
-                        # Check liquidity (volume + open interest)
-                        total_liquidity = 0
-                        for contract in contracts:
-                            total_liquidity += contract.get('totalVolume', 0) + contract.get('openInterest', 0)
-                        
-                        if total_liquidity > best_liquidity:
-                            best_liquidity = total_liquidity
-                            best_strike = strike_price
+            # Look for today's expiration in the option chains
+            today_options = {}
+            for exp_date_str, expiration_data in option_chains.items():
+                if today_str in exp_date_str:
+                    today_options = expiration_data
+                    break
             
-            return best_strike if best_strike else float(int(current_price))
+            if not today_options:
+                logger.warning("no_0dte_options", ticker=ticker, date=today_str)
+                return {}
+            
+            # Find nearest strikes to current price
+            put_strikes = today_options.get('PUT', {})
+            call_strikes = today_options.get('CALL', {})
+            
+            # Find nearest put strike (below current price)
+            put_strike = None
+            put_price = None
+            for strike_str in sorted(put_strikes.keys(), key=float, reverse=True):
+                strike_price = float(strike_str)
+                if strike_price < current_price:
+                    contracts = put_strikes[strike_str]
+                    if contracts:
+                        put_strike = strike_price
+                        put_price = contracts[0].get('mark', 0)
+                        break
+            
+            # Find nearest call strike (above current price)
+            call_strike = None
+            call_price = None
+            for strike_str in sorted(call_strikes.keys(), key=float):
+                strike_price = float(strike_str)
+                if strike_price > current_price:
+                    contracts = call_strikes[strike_str]
+                    if contracts:
+                        call_strike = strike_price
+                        call_price = contracts[0].get('mark', 0)
+                        break
+            
+            return {
+                'put_strike': put_strike,
+                'put_price': put_price,
+                'call_strike': call_strike,
+                'call_price': call_price,
+                'current_price': current_price,
+                'timestamp': datetime.now().isoformat()
+            }
             
         except Exception as e:
-            logger.error("put_strike_search_failed", error=str(e))
-            return float(int(current_price))
+            logger.error("0dte_option_chain_failed", error=str(e))
+            return {}
     
     def _find_nearest_call_strike(self, ticker: str, current_price: float) -> Optional[float]:
         """Find nearest call strike above current price with good liquidity."""

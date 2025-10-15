@@ -7,6 +7,7 @@ import { Cross } from '@/lib/crossDetection';
 import { formatToEST } from '@/lib/timezone';
 import { getMarketHoursSegments, isRegularTradingHours } from '@/lib/marketHours';
 import { TradeOptionPrice, getOptionPriceColor, getOptionPriceSymbol } from '@/lib/optionPrices';
+import { RealTimeOptionPrice } from '@/lib/realTimeOptions';
 import ChartZoom, { useChartZoom } from './ChartZoom';
 
 interface EquityChartProps {
@@ -14,6 +15,7 @@ interface EquityChartProps {
   ticker: string;
   crosses: Cross[];
   optionPrices?: TradeOptionPrice[];
+  realTimeOptionPrices?: RealTimeOptionPrice[];
   showNonMarketHours?: boolean;
   onToggleNonMarketHours?: (show: boolean) => void;
 }
@@ -23,11 +25,29 @@ export default function EquityChart({
   ticker, 
   crosses, 
   optionPrices = [], 
+  realTimeOptionPrices = [],
   showNonMarketHours = true,
   onToggleNonMarketHours 
 }: EquityChartProps) {
   const formatTime = (timestamp: string) => {
-    return formatToEST(timestamp, 'h:mm a');
+    const date = new Date(timestamp);
+    const estDate = new Date(date.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+    const minutes = estDate.getMinutes();
+    const hours = estDate.getHours();
+    
+    // Only show labels at 30-minute intervals starting from market open (9:30 AM)
+    const marketOpenHour = 9;
+    const marketOpenMinute = 30;
+    
+    // Check if this is a 30-minute interval
+    const isMarketHour = hours >= marketOpenHour && hours < 16; // 9:30 AM - 4:00 PM
+    const isHalfHour = minutes === 0 || minutes === 30;
+    
+    if (isMarketHour && isHalfHour) {
+      return formatToEST(timestamp, 'h:mm a');
+    }
+    
+    return '';
   };
 
   const formatPrice = (value: number) => `$${value.toFixed(2)}`;
@@ -54,13 +74,20 @@ export default function EquityChart({
       try {
         const cross = (crosses || []).find(c => c.timestamp === point.timestamp);
         const optionPrice = (optionPrices || []).find(op => op.timestamp === point.timestamp);
+        const realTimeOption = (realTimeOptionPrices || []).find(rt => rt.timestamp === point.timestamp);
+        
+        // Use real-time option prices if available, otherwise fall back to trade option prices
+        const currentOptionPrice = realTimeOption || optionPrice;
         
         return {
           ...point,
           crossMarker: cross ? cross.sma9 : null,  // Mark at SMA9/VWAP cross point
-          optionPrice: optionPrice ? optionPrice.price : null,
-          optionType: optionPrice ? optionPrice.option_type : null,
-          optionSymbol: optionPrice ? optionPrice.option_symbol : null
+          optionPrice: realTimeOption ? realTimeOption.put_price : 
+                      optionPrice ? optionPrice.price : null,
+          optionType: realTimeOption ? 'PUT' : 
+                     optionPrice ? optionPrice.option_type : null,
+          optionSymbol: realTimeOption ? `${ticker}_PUT_${realTimeOption.put_strike}` : 
+                       optionPrice ? optionPrice.option_symbol : null
         };
       } catch (error) {
         console.warn('Error processing chart point:', error);
@@ -73,7 +100,7 @@ export default function EquityChart({
         };
       }
     });
-  }, [filteredData, crosses, optionPrices]);
+  }, [filteredData, crosses, optionPrices, realTimeOptionPrices, ticker]);
 
   // Get market hours segments for background shading
   const marketSegments = React.useMemo(() => {
@@ -115,8 +142,9 @@ export default function EquityChart({
         isZoomed={isZoomed}
       />
       
-      <ResponsiveContainer width="100%" height={500}>
-        <ComposedChart data={zoomedData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+      <div style={{ position: 'relative' }}>
+        <ResponsiveContainer width="100%" height={500}>
+          <ComposedChart data={zoomedData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.2} />
           
           {/* Shade non-market hours with darker background (only if showing non-market hours) */}
@@ -240,7 +268,8 @@ export default function EquityChart({
                 />
               )}
             </ComposedChart>
-      </ResponsiveContainer>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }

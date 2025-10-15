@@ -8,6 +8,7 @@ import { ChartDataPoint } from '../../../shared/types';
 import { detectCrosses, filterCrossesByDate, Cross } from '@/lib/crossDetection';
 import { formatToEST } from '@/lib/timezone';
 import { getTradeOptionPrices, TradeOptionPrice } from '@/lib/optionPrices';
+import { realTimeOptionsService, RealTimeOptionPrice } from '@/lib/realTimeOptions';
 import EquityChart from './EquityChart';
 import ESTClock from './ESTClock';
 import SignalsDashboard from './SignalsDashboard';
@@ -20,6 +21,7 @@ export default function Dashboard() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [todayCrosses, setTodayCrosses] = useState<Cross[]>([]);
   const [optionPrices, setOptionPrices] = useState<TradeOptionPrice[]>([]);
+  const [realTimeOptionPrices, setRealTimeOptionPrices] = useState<RealTimeOptionPrice[]>([]);
   const [showNonMarketHours, setShowNonMarketHours] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -164,18 +166,72 @@ export default function Dashboard() {
     }
   };
 
+  const fetchRealTimeOptionPrices = async () => {
+    try {
+      const prices = await realTimeOptionsService.getHistoricalOptionPrices(ticker, selectedDate);
+      setRealTimeOptionPrices(prices || []);
+    } catch (error) {
+      console.error('Error fetching real-time option prices:', error);
+      setRealTimeOptionPrices([]);
+    }
+  };
+
   // Fetch data when ticker changes
   useEffect(() => {
     fetchData();
     fetchOptionPrices();
+    fetchRealTimeOptionPrices();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticker]);
 
   // Fetch option prices when date changes
   useEffect(() => {
     fetchOptionPrices();
+    fetchRealTimeOptionPrices();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate, ticker]);
+
+  // Start real-time options pricing for current ticker
+  useEffect(() => {
+    realTimeOptionsService.start(ticker);
+    
+    const unsubscribe = realTimeOptionsService.subscribe((update) => {
+      // Update real-time option prices
+      setRealTimeOptionPrices(prev => {
+        const updated = [...prev];
+        const existingIndex = updated.findIndex(p => p.timestamp === update.timestamp);
+        
+        if (existingIndex >= 0) {
+          updated[existingIndex] = {
+            timestamp: update.timestamp,
+            ticker: update.ticker,
+            put_strike: 590, // Mock strike prices
+            put_price: update.put_price,
+            call_strike: 595,
+            call_price: update.call_price,
+            current_price: update.current_price
+          };
+        } else {
+          updated.push({
+            timestamp: update.timestamp,
+            ticker: update.ticker,
+            put_strike: 590,
+            put_price: update.put_price,
+            call_strike: 595,
+            call_price: update.call_price,
+            current_price: update.current_price
+          });
+        }
+        
+        return updated.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      });
+    });
+
+    return () => {
+      unsubscribe();
+      realTimeOptionsService.stop();
+    };
+  }, [ticker]);
 
   // Real-time update every minute
   useEffect(() => {
@@ -325,6 +381,7 @@ export default function Dashboard() {
               ticker={ticker} 
               crosses={todayCrosses}
               optionPrices={optionPrices}
+              realTimeOptionPrices={realTimeOptionPrices}
               showNonMarketHours={showNonMarketHours}
               onToggleNonMarketHours={setShowNonMarketHours}
             />
