@@ -1,9 +1,10 @@
 'use client';
 
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceArea } from 'recharts';
 import { ChartDataPoint } from '../../../shared/types';
 import { Cross } from '@/lib/crossDetection';
 import { formatToEST } from '@/lib/timezone';
+import { getMarketHoursSegments } from '@/lib/marketHours';
 
 interface EquityChartProps {
   data: ChartDataPoint[];
@@ -27,6 +28,9 @@ export default function EquityChart({ data, ticker, crosses }: EquityChartProps)
     };
   });
 
+  // Get market hours segments for background shading
+  const marketSegments = getMarketHoursSegments(data);
+
   return (
     <div>
       <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
@@ -35,6 +39,19 @@ export default function EquityChart({ data, ticker, crosses }: EquityChartProps)
       <ResponsiveContainer width="100%" height={500}>
         <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.2} />
+          
+          {/* Shade non-market hours with darker background */}
+          {marketSegments.filter(seg => !seg.isMarketHours).map((segment, idx) => (
+            <ReferenceArea
+              key={`non-market-${idx}`}
+              x1={segment.start}
+              x2={segment.end}
+              fill="#6B7280"
+              fillOpacity={0.1}
+              ifOverflow="extendDomain"
+            />
+          ))}
+          
           <XAxis
             dataKey="timestamp"
             tickFormatter={formatTime}
