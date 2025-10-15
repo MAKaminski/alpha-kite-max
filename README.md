@@ -56,37 +56,36 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## Supabase Schema
+## Supabase Setup
 
-The application expects the following tables:
+### Applying Migrations
 
-### equity_data
-```sql
-CREATE TABLE equity_data (
-  id SERIAL PRIMARY KEY,
-  ticker VARCHAR(10) NOT NULL,
-  timestamp TIMESTAMPTZ NOT NULL,
-  price DECIMAL(10, 2) NOT NULL,
-  volume BIGINT NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+The database schema is managed through Supabase migrations.
 
-CREATE INDEX idx_equity_ticker_timestamp ON equity_data(ticker, timestamp);
+**Option 1: Using Supabase CLI** (Recommended)
+```bash
+# Login to Supabase
+supabase login
+
+# Link to your project
+supabase link --project-ref xwcauibwyxhsifnotnzz
+
+# Apply migrations
+supabase db push
 ```
 
-### indicators
-```sql
-CREATE TABLE indicators (
-  id SERIAL PRIMARY KEY,
-  ticker VARCHAR(10) NOT NULL,
-  timestamp TIMESTAMPTZ NOT NULL,
-  sma9 DECIMAL(10, 2),
-  vwap DECIMAL(10, 2),
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+**Option 2: Manual via SQL Editor**
 
-CREATE INDEX idx_indicators_ticker_timestamp ON indicators(ticker, timestamp);
+In your Supabase dashboard → SQL Editor, run the migration file:
+```bash
+supabase/migrations/20251015151016_create_equity_and_indicators_tables.sql
 ```
+
+This creates:
+- `equity_data` table with ticker, timestamp, price, volume
+- `indicators` table with ticker, timestamp, sma9, vwap
+- Indexes on (ticker, timestamp) for performance
+- Row-Level Security (RLS) policies
 
 ## Deployment
 
@@ -99,6 +98,29 @@ CREATE INDEX idx_indicators_ticker_timestamp ON indicators(ticker, timestamp);
 
 The project is configured to automatically deploy the `frontend` directory.
 
+## Backend Services
+
+The Python backend downloads equity data from Schwab and loads it into Supabase.
+
+### Setup
+```bash
+cd backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+### Usage
+```bash
+# Test connections
+python main.py --test-connections
+
+# Download data for QQQ (5 days)
+python main.py --ticker QQQ --days 5
+```
+
+See `backend/README.md` for detailed documentation.
+
 ## Project Structure
 
 ```
@@ -108,10 +130,15 @@ alpha-kite-max/
 │   │   ├── app/       # App router pages
 │   │   ├── components/# React components
 │   │   └── lib/       # Utilities and configs
-├── backend/           # Python services (future)
-├── shared/            # Shared types and configs
-├── context/           # Project documentation
-└── vercel.json        # Vercel configuration
+├── backend/           # Python services
+│   ├── schwab/       # Schwab API integration
+│   ├── tests/        # Test suites
+│   └── main.py       # CLI entry point
+├── supabase/         # Database migrations
+│   └── migrations/   # SQL migration files
+├── shared/           # Shared types and configs
+├── context/          # Project documentation
+└── vercel.json       # Vercel configuration
 ```
 
 ## License

@@ -21,6 +21,13 @@ venv.bak/
 .venv/
 pip-log.txt
 pip-delete-this-directory.txt
+*.egg-info/
+.mypy_cache/
+.pytest_cache/
+htmlcov/
+
+# Schwab tokens
+.schwab_tokens.json
 
 # Testing
 coverage/
