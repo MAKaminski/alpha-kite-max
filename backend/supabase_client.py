@@ -1,12 +1,16 @@
 """Supabase client for CRUD operations."""
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, TYPE_CHECKING
 import pandas as pd
 import structlog
 from supabase import create_client, Client
+from datetime import date
 
 from schwab_integration.config import SupabaseConfig
 
+# Conditional import to avoid circular dependencies
+if TYPE_CHECKING:
+    from models.trading import Position, Trade, TradingSignal, DailyPnL
 
 logger = structlog.get_logger()
 
@@ -200,7 +204,7 @@ class SupabaseClient:
     
     # Trading Operations
     
-    def get_open_positions(self, ticker: str) -> List[Position]:
+    def get_open_positions(self, ticker: str) -> List[Any]:
         """Get all open positions for a ticker."""
         try:
             response = self.client.table("positions")\
@@ -220,7 +224,7 @@ class SupabaseClient:
             logger.error("open_positions_fetch_failed", error=str(e))
             return []
     
-    def create_position(self, position: Position) -> str:
+    def create_position(self, position: Any) -> str:
         """Create a new position."""
         try:
             position_data = position.model_dump(exclude={'id', 'created_at', 'updated_at'})
@@ -237,7 +241,7 @@ class SupabaseClient:
             logger.error("position_creation_failed", error=str(e))
             raise
     
-    def update_position(self, position: Position) -> bool:
+    def update_position(self, position: Any) -> bool:
         """Update an existing position."""
         try:
             if not position.id:
@@ -256,7 +260,7 @@ class SupabaseClient:
             logger.error("position_update_failed", error=str(e))
             return False
     
-    def create_trade(self, trade: Trade) -> str:
+    def create_trade(self, trade: Any) -> str:
         """Create a new trade record."""
         try:
             trade_data = trade.model_dump(exclude={'id', 'created_at'})
@@ -273,7 +277,7 @@ class SupabaseClient:
             logger.error("trade_creation_failed", error=str(e))
             raise
     
-    def create_trading_signal(self, signal: TradingSignal) -> str:
+    def create_trading_signal(self, signal: Any) -> str:
         """Create a new trading signal record."""
         try:
             signal_data = signal.model_dump(exclude={'id', 'created_at'})
@@ -290,7 +294,7 @@ class SupabaseClient:
             logger.error("trading_signal_creation_failed", error=str(e))
             raise
     
-    def get_daily_pnl(self, ticker: str, trade_date: date) -> Optional[DailyPnL]:
+    def get_daily_pnl(self, ticker: str, trade_date: date) -> Optional[Any]:
         """Get daily P&L for a specific date."""
         try:
             response = self.client.table("daily_pnl")\
@@ -308,7 +312,7 @@ class SupabaseClient:
             logger.error("daily_pnl_fetch_failed", error=str(e))
             return None
     
-    def update_daily_pnl(self, daily_pnl: DailyPnL) -> bool:
+    def update_daily_pnl(self, daily_pnl: Any) -> bool:
         """Update or create daily P&L record."""
         try:
             pnl_data = daily_pnl.model_dump(exclude={'id', 'created_at'}, exclude_none=True)
