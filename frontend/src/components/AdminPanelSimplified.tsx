@@ -35,6 +35,13 @@ interface AdminPanelProps {
 export default function AdminPanelSimplified({ isOpen, onClose }: AdminPanelProps) {
   const [metrics, setMetrics] = useState<SystemMetrics | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Feature flags
+  const realTimeDataEnabled = useFeatureFlag('real-time-data');
+  const tradingEngineEnabled = useFeatureFlag('paper-trading');
+  const signalsDashboardEnabled = useFeatureFlag('signals-dashboard');
+  const darkModeEnabled = useFeatureFlag('dark-mode');
+  const debugModeEnabled = useFeatureFlag('debug-logs');
 
   useEffect(() => {
     if (!isOpen) return;
