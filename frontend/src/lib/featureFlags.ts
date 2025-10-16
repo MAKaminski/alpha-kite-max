@@ -72,7 +72,7 @@ class FeatureFlagsService {
         id: 'chart-zoom',
         name: 'Chart Zoom',
         description: 'Click and drag to zoom into chart sections',
-        enabled: false,
+        enabled: false,  // Default OFF per requirement
         category: 'ui',
         lastModified: new Date().toISOString(),
         modifiedBy: 'system'
@@ -99,7 +99,7 @@ class FeatureFlagsService {
         id: 'period-selector',
         name: 'Period Selector',
         description: 'Switch between minute and hour data views',
-        enabled: false,
+        enabled: false,  // Default OFF per requirement
         category: 'ui',
         lastModified: new Date().toISOString(),
         modifiedBy: 'system'
@@ -128,7 +128,7 @@ class FeatureFlagsService {
         id: 'real-time-options',
         name: 'Real-time Option Prices',
         description: 'Stream real-time option price updates',
-        enabled: false,
+        enabled: true,
         category: 'data',
         lastModified: new Date().toISOString(),
         modifiedBy: 'system'
@@ -227,7 +227,7 @@ class FeatureFlagsService {
         id: 'debug-logs',
         name: 'Debug Logging',
         description: 'Enable detailed console logging',
-        enabled: false,
+        enabled: true,
         category: 'debug',
         lastModified: new Date().toISOString(),
         modifiedBy: 'system'
@@ -236,7 +236,7 @@ class FeatureFlagsService {
         id: 'performance-metrics',
         name: 'Performance Metrics',
         description: 'Show performance timing information',
-        enabled: false,
+        enabled: true,
         category: 'debug',
         lastModified: new Date().toISOString(),
         modifiedBy: 'system'
@@ -245,7 +245,7 @@ class FeatureFlagsService {
         id: 'mock-data',
         name: 'Mock Data Mode',
         description: 'Use mock data instead of real API calls',
-        enabled: false,
+        enabled: false,  // Keep OFF - we want real data
         category: 'debug',
         lastModified: new Date().toISOString(),
         modifiedBy: 'system'
