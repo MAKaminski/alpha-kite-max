@@ -1,0 +1,36 @@
+name: Check Vercel Deployment
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  check-deployment:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Wait for Vercel Deployment
+        uses: patrickedqvist/wait-for-vercel-preview@v1.3.1
+        id: vercel-deployment
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          max_timeout: 300  # 5 minutes
+          check_interval: 10  # Check every 10 seconds
+      
+      - name: Deployment Success
+        if: steps.vercel-deployment.outputs.url != ''
+        run: |
+          echo "✅ Deployment succeeded!"
+          echo "🌐 URL: ${{ steps.vercel-deployment.outputs.url }}"
+      
+      - name: Deployment Failed
+        if: failure()
+        run: |
+          echo "❌ Deployment failed or timed out"
+          echo "🔗 Check Vercel dashboard for details"
+          exit 1
+
