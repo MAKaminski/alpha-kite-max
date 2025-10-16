@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { formatToEST } from '@/lib/timezone';
-import { useFeatureFlag, featureFlags } from '@/lib/featureFlags';
+import { useFeatureFlag } from '@/lib/featureFlags';
 
 interface SystemMetrics {
   // Health
