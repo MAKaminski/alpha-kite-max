@@ -54,11 +54,6 @@ interface AdminPanelProps {
   onClose: () => void;
 }
 
-interface FeatureFlagsPanelProps {
-  isOpen: boolean;
-  onClose: () => void;
-}
-
 export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
   const [metrics, setMetrics] = useState<SystemMetrics | null>(null);
   const [loading, setLoading] = useState(true);
@@ -147,14 +142,6 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
   const getStatusColor = (status: boolean) => status ? 'text-green-500' : 'text-red-500';
   const getStatusIcon = (status: boolean) => status ? '✅' : '❌';
 
-  const formatBytes = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
   const formatDuration = (minutes: number) => {
     if (minutes < 60) return `${minutes}m`;
     const hours = Math.floor(minutes / 60);
@@ -194,7 +181,7 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
             ].map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => setActiveTab(tab.id as 'status' | 'pipeline' | 'database' | 'trading' | 'costs' | 'features')}
                 className={`px-3 py-2 text-xs font-medium rounded-md transition-colors ${
                   activeTab === tab.id
                     ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
@@ -305,7 +292,7 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
                     </h3>
                     <div className="space-y-2">
                       <div className="flex justify-between">
-                        <span className="text-sm text-gray-600 dark:text-gray-400">Today's Executions</span>
+                        <span className="text-sm text-gray-600 dark:text-gray-400">Today&apos;s Executions</span>
                         <span className="text-sm text-gray-900 dark:text-white">{metrics.lambdaInvocations}</span>
                       </div>
                       <div className="flex justify-between">
