@@ -8,6 +8,7 @@ import structlog
 
 from schwab import auth, client
 from schwab.orders.equities import equity_buy_market
+from schwab.orders.options import option_sell_to_open_limit, option_buy_to_close_limit
 
 from .config import SchwabConfig
 
@@ -203,6 +204,136 @@ class SchwabClient:
         )
         
         return data
+    
+    def get_account_info(self) -> dict:
+        """Get account information including account number.
+        
+        Returns:
+            Dictionary with account information
+        """
+        logger.info("fetching_account_info")
+        
+        client_instance = self.authenticate()
+        response = client_instance.get_account_numbers()
+        
+        if response.status_code != 200:
+            logger.error(
+                "account_info_fetch_failed",
+                status_code=response.status_code,
+                response=response.text
+            )
+            response.raise_for_status()
+        
+        accounts = response.json()
+        logger.info("account_info_fetched", account_count=len(accounts))
+        
+        # Return the first account (typically paper trading account)
+        if accounts:
+            return accounts[0]
+        return {}
+    
+    def place_option_order(
+        self,
+        account_id: str,
+        symbol: str,
+        option_symbol: str,
+        instruction: str,  # 'SELL_TO_OPEN' or 'BUY_TO_CLOSE'
+        quantity: int,
+        price: float
+    ) -> dict:
+        """Place an option order.
+        
+        Args:
+            account_id: Schwab account ID
+            symbol: Underlying stock symbol
+            option_symbol: Full option symbol (e.g., QQQ_102524P500)
+            instruction: Order instruction ('SELL_TO_OPEN' or 'BUY_TO_CLOSE')
+            quantity: Number of contracts
+            price: Limit price per contract
+            
+        Returns:
+            Dictionary with order details
+        """
+        logger.info(
+            "placing_option_order",
+            symbol=symbol,
+            option_symbol=option_symbol,
+            instruction=instruction,
+            quantity=quantity,
+            price=price
+        )
+        
+        client_instance = self.authenticate()
+        
+        # Build order based on instruction
+        if instruction == 'SELL_TO_OPEN':
+            order = option_sell_to_open_limit(option_symbol, quantity, price)
+        elif instruction == 'BUY_TO_CLOSE':
+            order = option_buy_to_close_limit(option_symbol, quantity, price)
+        else:
+            raise ValueError(f"Invalid instruction: {instruction}")
+        
+        # Place the order
+        response = client_instance.place_order(account_id, order)
+        
+        if response.status_code not in [200, 201]:
+            logger.error(
+                "option_order_failed",
+                status_code=response.status_code,
+                response=response.text
+            )
+            response.raise_for_status()
+        
+        # Extract order ID from location header
+        order_id = None
+        if 'Location' in response.headers:
+            location = response.headers['Location']
+            order_id = location.split('/')[-1]
+        
+        logger.info(
+            "option_order_placed",
+            order_id=order_id,
+            symbol=symbol,
+            option_symbol=option_symbol
+        )
+        
+        return {
+            'order_id': order_id,
+            'status_code': response.status_code,
+            'symbol': symbol,
+            'option_symbol': option_symbol,
+            'instruction': instruction,
+            'quantity': quantity,
+            'price': price
+        }
+    
+    def get_order_status(self, account_id: str, order_id: str) -> dict:
+        """Get order status.
+        
+        Args:
+            account_id: Schwab account ID
+            order_id: Order ID
+            
+        Returns:
+            Dictionary with order status
+        """
+        logger.info("fetching_order_status", order_id=order_id)
+        
+        client_instance = self.authenticate()
+        response = client_instance.get_order(account_id, order_id)
+        
+        if response.status_code != 200:
+            logger.error(
+                "order_status_fetch_failed",
+                status_code=response.status_code,
+                response=response.text
+            )
+            response.raise_for_status()
+        
+        order_data = response.json()
+        logger.info("order_status_fetched", order_id=order_id, status=order_data.get('status'))
+        
+        return order_data
     
     def close(self):
         """Close the client session."""

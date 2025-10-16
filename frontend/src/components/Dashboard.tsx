@@ -9,10 +9,13 @@ import { detectCrosses, filterCrossesByDate, Cross } from '@/lib/crossDetection'
 import { formatToEST } from '@/lib/timezone';
 import { getTradeOptionPrices, TradeOptionPrice } from '@/lib/optionPrices';
 import { realTimeOptionsService, RealTimeOptionPrice } from '@/lib/realTimeOptions';
+import { useFeatureFlag } from '@/lib/featureFlags';
 import EquityChart from './EquityChart';
 import ESTClock from './ESTClock';
 import SignalsDashboard from './SignalsDashboard';
 import TradingDashboard from './TradingDashboard';
+import AdminPanel from './AdminPanel';
+import DarkModeToggle from './DarkModeToggle';
 
 export default function Dashboard() {
   const [ticker, setTicker] = useState('QQQ');
@@ -23,8 +26,80 @@ export default function Dashboard() {
   const [optionPrices, setOptionPrices] = useState<TradeOptionPrice[]>([]);
   const [realTimeOptionPrices, setRealTimeOptionPrices] = useState<RealTimeOptionPrice[]>([]);
   const [showNonMarketHours, setShowNonMarketHours] = useState(true);
+  const [period, setPeriod] = useState<'minute' | 'hour'>('minute');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
+
+  // Feature flags
+  const realTimeDataEnabled = useFeatureFlag('real-time-data');
+  const realTimeClockEnabled = useFeatureFlag('real-time-clock');
+  const signalsDashboardEnabled = useFeatureFlag('signals-dashboard');
+  const tradingDashboardEnabled = useFeatureFlag('trading-dashboard');
+  const adminPanelEnabled = useFeatureFlag('admin-panel');
+  const optionPricesEnabled = useFeatureFlag('option-prices');
+  const realTimeOptionsEnabled = useFeatureFlag('real-time-options');
+  const crossDetectionEnabled = useFeatureFlag('cross-detection');
+  const marketHoursHighlightingEnabled = useFeatureFlag('market-hours-highlighting');
+  const nonMarketHoursToggleEnabled = useFeatureFlag('non-market-hours-toggle');
+  const darkModeEnabled = useFeatureFlag('dark-mode');
+
+  // Aggregate minute data to hourly data
+  const aggregateToHourly = (data: ChartDataPoint[]): ChartDataPoint[] => {
+    if (data.length === 0) return [];
+    
+    // Group data by hour
+    const hourlyGroups: { [key: string]: ChartDataPoint[] } = {};
+    
+    data.forEach(point => {
+      const date = new Date(point.timestamp);
+      const hourKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:00:00`;
+      
+      if (!hourlyGroups[hourKey]) {
+        hourlyGroups[hourKey] = [];
+      }
+      hourlyGroups[hourKey].push(point);
+    });
+    
+    // Aggregate each hour
+    const hourlyData: ChartDataPoint[] = Object.entries(hourlyGroups).map(([hourKey, points]) => {
+      if (points.length === 0) return null;
+      
+      // Calculate OHLC and volume-weighted averages
+      const prices = points.map(p => p.price);
+      const volumes = points.map(p => p.volume);
+      const sma9Values = points.map(p => p.sma9);
+      const vwapValues = points.map(p => p.vwap);
+      
+      const open = prices[0];
+      const high = Math.max(...prices);
+      const low = Math.min(...prices);
+      const close = prices[prices.length - 1];
+      const totalVolume = volumes.reduce((sum, vol) => sum + vol, 0);
+      
+      // Use close price as the representative price
+      const price = close;
+      
+      // Volume-weighted average of SMA9 and VWAP
+      const totalVolumeWeight = volumes.reduce((sum, vol) => sum + vol, 0);
+      const sma9 = totalVolumeWeight > 0 ? 
+        sma9Values.reduce((sum, val, i) => sum + (val * volumes[i]), 0) / totalVolumeWeight : 
+        sma9Values[sma9Values.length - 1];
+      const vwap = totalVolumeWeight > 0 ? 
+        vwapValues.reduce((sum, val, i) => sum + (val * volumes[i]), 0) / totalVolumeWeight : 
+        vwapValues[vwapValues.length - 1];
+      
+      return {
+        timestamp: hourKey,
+        price,
+        volume: totalVolume,
+        sma9,
+        vwap
+      };
+    }).filter(Boolean) as ChartDataPoint[];
+    
+    return hourlyData.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -93,11 +168,13 @@ export default function Dashboard() {
         };
       });
 
-      setAllData(mergedData);
+      // Apply period aggregation if needed
+      const processedData = period === 'hour' ? aggregateToHourly(mergedData) : mergedData;
+      setAllData(processedData);
       
       // Set selected date to most recent data
-      if (mergedData.length > 0) {
-        const latestDate = new Date(mergedData[mergedData.length - 1].timestamp);
+      if (processedData.length > 0) {
+        const latestDate = new Date(processedData[processedData.length - 1].timestamp);
         setSelectedDate(latestDate);
       }
     } catch (err) {
@@ -176,23 +253,36 @@ export default function Dashboard() {
     }
   };
 
-  // Fetch data when ticker changes
+  // Fetch data when ticker or period changes
   useEffect(() => {
     fetchData();
-    fetchOptionPrices();
-    fetchRealTimeOptionPrices();
+    if (optionPricesEnabled) {
+      fetchOptionPrices();
+    }
+    if (realTimeOptionsEnabled) {
+      fetchRealTimeOptionPrices();
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ticker]);
+  }, [ticker, period, optionPricesEnabled, realTimeOptionsEnabled]);
 
-  // Fetch option prices when date changes
+  // Fetch option prices when date changes (only if enabled)
   useEffect(() => {
-    fetchOptionPrices();
-    fetchRealTimeOptionPrices();
+    if (optionPricesEnabled) {
+      fetchOptionPrices();
+    }
+    if (realTimeOptionsEnabled) {
+      fetchRealTimeOptionPrices();
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate, ticker]);
+  }, [selectedDate, ticker, optionPricesEnabled, realTimeOptionsEnabled]);
 
-  // Start real-time options pricing for current ticker
+  // Start real-time options pricing for current ticker (only if enabled)
   useEffect(() => {
+    if (!realTimeOptionsEnabled) {
+      setRealTimeOptionPrices([]);
+      return;
+    }
+
     realTimeOptionsService.start(ticker);
     
     const unsubscribe = realTimeOptionsService.subscribe((update) => {
@@ -231,17 +321,19 @@ export default function Dashboard() {
       unsubscribe();
       realTimeOptionsService.stop();
     };
-  }, [ticker]);
+  }, [ticker, realTimeOptionsEnabled]);
 
-  // Real-time update every minute
+  // Real-time update every minute (only if enabled)
   useEffect(() => {
+    if (!realTimeDataEnabled) return;
+
     const interval = setInterval(() => {
       fetchLatestData();
     }, 60000); // 60 seconds
 
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ticker]);
+  }, [ticker, realTimeDataEnabled]);
 
   // Filter data by selected date
   useEffect(() => {
@@ -255,11 +347,15 @@ export default function Dashboard() {
 
     setDisplayData(filtered);
 
-    // Detect all crosses and filter for selected date
-    const crosses = detectCrosses(allData);
-    const dayCrosses = filterCrossesByDate(crosses, selectedDate);
-    setTodayCrosses(dayCrosses);
-  }, [allData, selectedDate]);
+    // Detect all crosses and filter for selected date (only if enabled)
+    if (crossDetectionEnabled) {
+      const crosses = detectCrosses(allData);
+      const dayCrosses = filterCrossesByDate(crosses, selectedDate);
+      setTodayCrosses(dayCrosses);
+    } else {
+      setTodayCrosses([]);
+    }
+  }, [allData, selectedDate, crossDetectionEnabled]);
 
   const goToPreviousDay = () => {
     const newDate = new Date(selectedDate);
@@ -284,7 +380,7 @@ export default function Dashboard() {
             </h1>
             
             <div className="flex items-center gap-4">
-              <ESTClock />
+              {realTimeClockEnabled && <ESTClock />}
               
               <div className="flex items-center gap-2">
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -298,6 +394,23 @@ export default function Dashboard() {
                   placeholder="Enter ticker"
                 />
               </div>
+
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Period:
+                </label>
+                <select
+                  value={period}
+                  onChange={(e) => setPeriod(e.target.value as 'minute' | 'hour')}
+                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="minute">Minute</option>
+                  <option value="hour">Hour</option>
+                </select>
+              </div>
+
+              {/* Dark Mode Toggle */}
+              {darkModeEnabled && <DarkModeToggle />}
             </div>
           </div>
 
@@ -379,11 +492,13 @@ export default function Dashboard() {
             <EquityChart 
               data={displayData} 
               ticker={ticker} 
-              crosses={todayCrosses}
-              optionPrices={optionPrices}
-              realTimeOptionPrices={realTimeOptionPrices}
+              crosses={crossDetectionEnabled ? todayCrosses : []}
+              optionPrices={optionPricesEnabled ? optionPrices : []}
+              realTimeOptionPrices={realTimeOptionsEnabled ? realTimeOptionPrices : []}
               showNonMarketHours={showNonMarketHours}
-              onToggleNonMarketHours={setShowNonMarketHours}
+              onToggleNonMarketHours={nonMarketHoursToggleEnabled ? setShowNonMarketHours : undefined}
+              marketHoursHighlighting={marketHoursHighlightingEnabled}
+              period={period}
             />
           )}
 
@@ -397,14 +512,33 @@ export default function Dashboard() {
         </div>
 
         {/* Trading Dashboard */}
-        {!loading && !error && (
+        {!loading && !error && tradingDashboardEnabled && (
           <TradingDashboard ticker={ticker} selectedDate={selectedDate} />
         )}
 
         {/* Signals Dashboard */}
-        {!loading && !error && (
+        {!loading && !error && signalsDashboardEnabled && (
           <SignalsDashboard crosses={todayCrosses} selectedDate={selectedDate} />
         )}
+
+        {/* Admin Panel Toggle */}
+        {adminPanelEnabled && (
+          <div className="fixed bottom-4 right-4">
+            <button
+              onClick={() => setShowAdminPanel(true)}
+              className="bg-gray-800 hover:bg-gray-700 text-white p-3 rounded-full shadow-lg transition-colors"
+              title="Open Admin Panel"
+            >
+              ⚙️
+            </button>
+          </div>
+        )}
+
+        {/* Admin Panel */}
+        <AdminPanel
+          isOpen={showAdminPanel}
+          onClose={() => setShowAdminPanel(false)}
+        />
       </div>
     </div>
   );

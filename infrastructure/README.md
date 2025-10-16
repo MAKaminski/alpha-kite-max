@@ -295,3 +295,34 @@ After deployment:
 4. Set up CloudWatch alarms
 5. Configure SNS notifications (optional)
 
+## Lambda Package Optimization
+
+### Using uv for Faster Builds
+
+This project uses `uv` (ultra-fast Python package manager) for significantly faster package installation and deployment:
+
+```bash
+# Install uv if not already installed
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Build optimized Lambda package
+cd backend/lambda
+./deploy_uv.sh
+```
+
+### Package Size Optimization
+
+The deployment script automatically:
+- Uses `uv` for faster package installation (10x faster than pip)
+- Excludes heavy packages (pandas, numpy) not needed for Lambda
+- Removes test files and unnecessary metadata
+- Targets package size under 5MB for optimal Lambda performance
+- Only includes essential runtime dependencies
+
+### Benefits of uv
+
+- **Speed**: 10-100x faster than pip for package resolution
+- **Reliability**: Better dependency resolution and conflict detection
+- **Size**: More efficient package management reduces Lambda package size
+- **Compatibility**: Drop-in replacement for pip with better performance
+

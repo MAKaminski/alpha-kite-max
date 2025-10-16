@@ -37,12 +37,13 @@ class ETLPipeline:
         
         logger.info("etl_pipeline_initialized")
     
-    def run(self, ticker: Optional[str] = None, days: Optional[int] = None) -> dict:
+    def run(self, ticker: Optional[str] = None, days: Optional[int] = None, start_date: Optional[str] = None) -> dict:
         """Run the full ETL pipeline.
         
         Args:
             ticker: Stock ticker symbol (default from config)
             days: Number of days to fetch (default from config)
+            start_date: Start date for data download (YYYY-MM-DD format)
             
         Returns:
             Dictionary with pipeline results
@@ -50,12 +51,12 @@ class ETLPipeline:
         ticker = ticker or self.app_config.default_ticker
         days = days or self.app_config.lookback_days
         
-        logger.info("starting_etl_pipeline", ticker=ticker, days=days)
+        logger.info("starting_etl_pipeline", ticker=ticker, days=days, start_date=start_date)
         
         try:
             # Step 1: Download equity data from Schwab
             logger.info("step_1_download_equity_data")
-            equity_df = self.downloader.download_minute_data(ticker, days)
+            equity_df = self.downloader.download_minute_data(ticker, days, start_date)
             
             if equity_df.empty:
                 logger.warning("no_data_downloaded", ticker=ticker)

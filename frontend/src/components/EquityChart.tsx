@@ -17,6 +17,8 @@ interface EquityChartProps {
   realTimeOptionPrices?: RealTimeOptionPrice[];
   showNonMarketHours?: boolean;
   onToggleNonMarketHours?: (show: boolean) => void;
+  marketHoursHighlighting?: boolean;
+  period?: 'minute' | 'hour';
 }
 
 export default function EquityChart({ 
@@ -26,7 +28,9 @@ export default function EquityChart({
   optionPrices = [], 
   realTimeOptionPrices = [],
   showNonMarketHours = true,
-  onToggleNonMarketHours 
+  onToggleNonMarketHours,
+  marketHoursHighlighting = true,
+  period = 'minute'
 }: EquityChartProps) {
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp);
@@ -114,9 +118,9 @@ export default function EquityChart({
   return (
     <div>
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-          Chart | SMA9, Session VWAP
-        </h2>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+              Chart | SMA9, Session VWAP ({period === 'minute' ? 'Minute' : 'Hour'} Data)
+            </h2>
         <div className="flex items-center gap-4">
           <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
             <input
@@ -134,17 +138,17 @@ export default function EquityChart({
         <ComposedChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.2} />
           
-          {/* Shade non-market hours with darker background (only if showing non-market hours) */}
-          {showNonMarketHours && marketSegments.filter(seg => !seg.isMarketHours).map((segment, idx) => (
-            <ReferenceArea
-              key={`non-market-${idx}`}
-              x1={segment.start}
-              x2={segment.end}
-              fill="#374151"
-              fillOpacity={0.15}
-              ifOverflow="extendDomain"
-            />
-          ))}
+                {/* Shade non-market hours with darker background (only if showing non-market hours and highlighting is enabled) */}
+                {showNonMarketHours && marketHoursHighlighting && marketSegments.filter(seg => !seg.isMarketHours).map((segment, idx) => (
+                  <ReferenceArea
+                    key={`non-market-${idx}`}
+                    x1={segment.start}
+                    x2={segment.end}
+                    fill="#374151"
+                    fillOpacity={0.15}
+                    ifOverflow="extendDomain"
+                  />
+                ))}
           
           <XAxis
             dataKey="timestamp"

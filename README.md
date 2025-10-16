@@ -2,6 +2,10 @@
 
 Trading dashboard with real-time equity data visualization featuring SMA9 and Session VWAP indicators.
 
+## License
+
+This project is licensed under the MIT License with commercial use restrictions. See [LICENSE](LICENSE) for details.
+
 ## Features
 
 - Real-time equity data display (default: QQQ)
@@ -105,9 +109,14 @@ The Python backend downloads equity data from Schwab and loads it into Supabase.
 ### Setup
 ```bash
 cd backend
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+uv venv
+source .venv/bin/activate
+uv pip install -r requirements.txt
+```
+
+**Note**: This project uses `uv` for faster Python package management. If you don't have `uv` installed, run:
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
 ### Usage
@@ -140,6 +149,15 @@ alpha-kite-max/
 ├── context/          # Project documentation
 └── vercel.json       # Vercel configuration
 ```
+
+## Documentation
+
+- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Complete system architecture and technical specifications
+- **[Quick Start Guide](./context/docs/QUICKSTART_AWS.md)** - Get up and running in 15 minutes
+- **[Deployment Guide](./context/docs/DEPLOYMENT.md)** - Production deployment instructions
+- **[AWS Deployment](./context/docs/DEPLOYMENT_AWS.md)** - Detailed AWS Lambda setup
+- **[Implementation Status](./context/docs/IMPLEMENTATION_STATUS.md)** - Current feature status
+- **[Progress Summary](./context/docs/PROGRESS_SUMMARY.md)** - Latest development progress
 
 ## License
 

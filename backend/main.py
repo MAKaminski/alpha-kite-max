@@ -42,6 +42,11 @@ def main():
         help="Number of days of historical data to fetch (default: 5)"
     )
     parser.add_argument(
+        "--start-date",
+        type=str,
+        help="Start date for data download (YYYY-MM-DD format)"
+    )
+    parser.add_argument(
         "--test-connections",
         action="store_true",
         help="Test connections to Schwab and Supabase only"
@@ -71,7 +76,7 @@ def main():
     
     # Run ETL pipeline
     logger.info("running_etl_pipeline")
-    result = pipeline.run(ticker=args.ticker, days=args.days)
+    result = pipeline.run(ticker=args.ticker, days=args.days, start_date=args.start_date)
     
     if result["success"]:
         print(f"\n✓ ETL Pipeline completed successfully!")

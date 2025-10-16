@@ -27,13 +27,15 @@ class EquityDownloader:
     def download_minute_data(
         self,
         ticker: str,
-        days: int = 5
+        days: int = 5,
+        start_date: Optional[str] = None
     ) -> pd.DataFrame:
         """Download minute-level price data for a ticker.
         
         Args:
             ticker: Stock ticker symbol
             days: Number of days of historical data to fetch
+            start_date: Start date for data download (YYYY-MM-DD format)
             
         Returns:
             DataFrame with columns: ticker, timestamp, price, volume
