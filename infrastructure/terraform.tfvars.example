@@ -1,0 +1,15 @@
+# AWS Configuration
+aws_region     = "us-east-1"
+environment    = "prod"
+default_ticker = "QQQ"
+
+# Supabase Configuration
+# Get these from: https://supabase.com/dashboard/project/_/settings/api
+supabase_url = "https://your-project-id.supabase.co"
+supabase_key = "your-supabase-service-role-key"
+
+# Schwab API Configuration
+# Get these from: https://developer.schwab.com
+schwab_app_key = "your-schwab-app-key"
+schwab_secret  = "your-schwab-app-secret"
+
