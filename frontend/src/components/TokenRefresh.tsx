@@ -216,7 +216,7 @@ export const TokenRefresh: React.FC<TokenRefreshProps> = ({ className = '' }) =>
         <p className="font-medium">💡 Token Refresh Info:</p>
         <ul className="mt-1 space-y-1 text-xs">
           <li>• Schwab tokens expire every 7 days</li>
-          <li>• Click "Refresh Token" to extend for another 7 days</li>
+          <li>• Click &quot;Refresh Token&quot; to extend for another 7 days</li>
           <li>• If refresh fails, manual re-authentication is required</li>
           <li>• Token refresh updates both local and AWS Secrets Manager</li>
         </ul>
