@@ -152,25 +152,30 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex">
-      <div className="bg-white dark:bg-gray-800 w-96 h-full overflow-y-auto">
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+    <div className="fixed inset-0 bg-gray-50 dark:bg-gray-900 z-50 overflow-auto">
+      <div className="min-h-screen p-6">
+        {/* Header */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-6">
           <div className="flex justify-between items-center">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              System Admin Panel
-            </h2>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">System Administration</h1>
+              <p className="text-gray-600 dark:text-gray-400 mt-1">Monitor and manage Alpha Kite Max infrastructure</p>
+            </div>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-3xl font-bold transition-colors"
+              aria-label="Close admin panel"
             >
               ✕
             </button>
           </div>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="border-b border-gray-200 dark:border-gray-700">
-          <nav className="flex space-x-1 p-2">
+        {/* Main Dashboard */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+          {/* Tab Navigation */}
+          <div className="border-b border-gray-200 dark:border-gray-700 px-6 pt-4">
+            <nav className="flex space-x-4">
             {[
               { id: 'status', label: 'Status', icon: '📊' },
               { id: 'pipeline', label: 'Pipeline', icon: '⚡' },
@@ -182,10 +187,10 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as 'status' | 'pipeline' | 'database' | 'trading' | 'costs' | 'features')}
-                className={`px-3 py-2 text-xs font-medium rounded-md transition-colors ${
+                className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
                   activeTab === tab.id
-                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                    ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 hover:border-gray-300'
                 }`}
               >
                 {tab.icon} {tab.label}
@@ -194,7 +199,7 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
           </nav>
         </div>
 
-        <div className="p-4">
+        <div className="p-6">
           {loading ? (
             <div className="flex items-center justify-center h-64">
               <div className="text-gray-500">Loading metrics...</div>
@@ -592,6 +597,7 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
           isOpen={showFeatureFlags}
           onClose={() => setShowFeatureFlags(false)}
         />
+        </div>
       </div>
     </div>
   );

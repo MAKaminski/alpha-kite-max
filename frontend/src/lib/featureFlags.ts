@@ -156,8 +156,8 @@ class FeatureFlagsService {
       {
         id: 'paper-trading',
         name: 'Paper Trading',
-        description: 'Enable simulated trading based on signals',
-        enabled: false,
+        description: 'Enable paper trading based on signals',
+        enabled: true,  // Default ON - safe for paper trading
         category: 'trading',
         lastModified: new Date().toISOString(),
         modifiedBy: 'system'

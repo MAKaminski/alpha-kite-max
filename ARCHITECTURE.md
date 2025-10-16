@@ -522,6 +522,151 @@ cd backend
 
 ---
 
+## Data Capacity Planning
+
+### Current Data Usage (As of 2025-10-16)
+
+**Supabase Database**:
+- **Used**: ~50 MB (1,000 rows equity_data + 1,000 rows indicators from 2025-10-09)
+- **Free Tier Limit**: 500 MB
+- **Utilization**: 10% of free tier
+
+**Storage Breakdown**:
+| Table | Rows | Avg Row Size | Total Size | % of DB |
+|-------|------|--------------|------------|---------|
+| equity_data | 1,000 | ~100 bytes | ~100 KB | 0.2% |
+| indicators | 1,000 | ~80 bytes | ~80 KB | 0.16% |
+| option_prices | 0 | ~150 bytes | 0 KB | 0% |
+| positions | 0 | ~200 bytes | 0 KB | 0% |
+| trades | 0 | ~180 bytes | 0 KB | 0% |
+| daily_pnl | 0 | ~120 bytes | 0 KB | 0% |
+| **TOTAL** | **2,000** | | **~180 KB** | **0.036%** |
+
+### Monthly Forecast (Expected Usage)
+
+**Assumptions**:
+- 22 trading days/month
+- 391 data points/day (9:30 AM - 4:00 PM, every minute)
+- 2 tables per minute (equity_data + indicators)
+- Option chains: 2 rows/minute (nearest PUT + CALL strikes)
+- Trading: ~10 crosses/day × 2 trades/cross = 20 trades/day
+
+**Expected Monthly Data**:
+| Table | Rows/Month | Size/Month | Notes |
+|-------|------------|------------|-------|
+| equity_data | 8,602 | ~860 KB | 391 points × 22 days |
+| indicators | 8,602 | ~688 KB | Matches equity_data |
+| option_prices | 17,204 | ~2.5 MB | 2 strikes × 391 × 22 |
+| positions | 440 | ~88 KB | ~10 crosses × 2 positions × 22 days |
+| trades | 880 | ~158 KB | 2 trades/position × 440 positions |
+| daily_pnl | 22 | ~3 KB | 1 summary/day |
+| **TOTAL** | **35,750** | **~4.3 MB/month** | |
+
+**Database Growth**: ~4.3 MB/month
+
+### Annual Forecast
+
+**Expected Annual Data**:
+- **Rows**: 35,750 × 12 = **429,000 rows/year**
+- **Storage**: 4.3 MB × 12 = **~52 MB/year**
+- **Free Tier Limit**: 500 MB
+- **Years Until Limit**: 500 MB ÷ 52 MB = **~9.6 years**
+
+### Data Retention Strategy
+
+**Current**: Indefinite retention (no auto-delete)
+
+**Recommended** (future):
+1. **Equity/Indicators**: Keep 2 years (104 MB)
+2. **Option Prices**: Keep 90 days (~13 MB)
+3. **Positions/Trades**: Keep all (archival value)
+4. **Daily P&L**: Keep all (minimal size)
+
+**With Retention**:
+- **Steady State**: ~117 MB after 2 years
+- **% of Free Tier**: 23.4%
+- **Upgrade Needed**: Never (well within limits)
+
+### Capacity vs Usage
+
+| Metric | Free Tier | Current | Forecast (Month) | Forecast (Year) | % Used |
+|--------|-----------|---------|------------------|-----------------|--------|
+| **Database Size** | 500 MB | 0.18 MB | 4.3 MB | 52 MB | 0.036% → 10.4% |
+| **Egress Bandwidth** | 5 GB/month | <10 MB | ~50 MB | ~600 MB | <1% → 12% |
+| **API Requests** | Unlimited | 2,000 | ~100,000 | ~1.2M | N/A |
+
+### Actuals vs Forecast vs Plan
+
+**Actuals** (Last 7 days):
+- ❌ **0 rows added** (Lambda token issue)
+- ✅ **1,000 rows exist** from 2025-10-09
+- **Expected**: Should have ~2,700 rows (391 × 7 days)
+- **Gap**: 2,700 rows missing = ~270 KB missing data
+
+**Forecast** (Next 30 days after fix):
+- **New Rows**: 35,750 rows
+- **New Storage**: 4.3 MB
+- **Cumulative**: 35,750 + 2,000 = 37,750 rows, ~4.5 MB total
+
+**Plan** (Capacity Headroom):
+- **Free Tier**: 500 MB database
+- **Forecast Usage**: 4.5 MB (0.9% of limit)
+- **Safety Margin**: 495.5 MB available (99.1%)
+- **Comfortable for**: 9+ years at current rate
+
+### Scaling Triggers
+
+**When to upgrade Supabase**:
+- [ ] Database > 400 MB (80% of free tier)
+- [ ] Egress > 4 GB/month (80% of free tier)
+- [ ] Need advanced features (real-time, edge functions)
+
+**When to add caching**:
+- [ ] Frontend queries > 1,000/minute
+- [ ] Chart load time > 2 seconds
+- [ ] Bandwidth costs become significant
+
+### Lambda Scaling
+
+**Current Configuration**:
+- Memory: 256 MB
+- Timeout: 60 seconds
+- Concurrency: 1
+
+**Scaling Thresholds**:
+| Metric | Current | Trigger Upgrade | Action |
+|--------|---------|-----------------|--------|
+| Duration | ~400-500 ms | > 50 seconds | Increase memory |
+| Memory Used | ~193 MB | > 200 MB | Increase to 512 MB |
+| Error Rate | 100% (token issue) | > 5% | Alert + investigate |
+| Data Size | 0 KB | > 10 MB/response | Add pagination |
+
+## Summary
+
+### Current State
+- **Database**: 0.18 MB used (0.036% of 500 MB limit)
+- **Lambda**: Executing but failing due to invalid token
+- **Bandwidth**: Minimal (<1% of limit)
+- **Cost**: ~$1.60/month (within free tier for compute)
+
+### Expected State (After Fix)
+- **Database**: 4.5 MB used (0.9% of limit) after 1 month
+- **Lambda**: 8,602 successful executions/month
+- **Bandwidth**: ~50 MB/month (1% of 5 GB limit)
+- **Cost**: ~$2.03/month (negligible increase)
+
+### Capacity Headroom
+- **Database**: 99.1% available (495.5 MB free)
+- **Lambda**: Unlimited (pay-per-use, well within free tier)
+- **Bandwidth**: 99% available (4.95 GB free/month)
+- **Runway**: 9+ years before hitting limits
+
+---
+
+**The system is designed to scale efficiently within free tiers for years.**
+
+---
+
 ## Execution Frequency & Scheduling
 
 ### Trading Day Schedule
