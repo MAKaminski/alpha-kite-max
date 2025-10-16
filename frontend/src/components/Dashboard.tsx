@@ -14,7 +14,7 @@ import EquityChart from './EquityChart';
 import ESTClock from './ESTClock';
 import SignalsDashboard from './SignalsDashboard';
 import TradingDashboard from './TradingDashboard';
-import AdminPanel from './AdminPanel';
+import AdminPanelSimplified from './AdminPanelSimplified';
 import DarkModeToggle from './DarkModeToggle';
 
 export default function Dashboard() {
@@ -532,7 +532,7 @@ export default function Dashboard() {
         )}
 
         {/* Admin Panel */}
-        <AdminPanel
+        <AdminPanelSimplified
           isOpen={showAdminPanel}
           onClose={() => setShowAdminPanel(false)}
         />
