@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { formatToEST } from '@/lib/timezone';
 import { useFeatureFlag } from '@/lib/featureFlags';
+import { TokenRefresh } from './TokenRefresh';
 
 interface SystemMetrics {
   // Health
@@ -337,6 +338,11 @@ export default function AdminPanelSimplified({ isOpen, onClose }: AdminPanelProp
                   </span>
                 </div>
               </div>
+            </div>
+
+            {/* Token Refresh */}
+            <div className="lg:col-span-2">
+              <TokenRefresh />
             </div>
 
           </div>
