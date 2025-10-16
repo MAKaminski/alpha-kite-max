@@ -1,6 +1,8 @@
 // Feature Flags Service
 // This service manages feature toggles for the application
 
+import { useState, useEffect } from 'react';
+
 export interface FeatureFlag {
   id: string;
   name: string;
@@ -362,9 +364,9 @@ export const featureFlags = new FeatureFlagsService();
 
 // React hook for using feature flags
 export function useFeatureFlag(flagId: string): boolean {
-  const [enabled, setEnabled] = React.useState(featureFlags.isEnabled(flagId));
+  const [enabled, setEnabled] = useState(featureFlags.isEnabled(flagId));
 
-  React.useEffect(() => {
+  useEffect(() => {
     const unsubscribe = featureFlags.subscribe(() => {
       setEnabled(featureFlags.isEnabled(flagId));
     });
@@ -376,9 +378,9 @@ export function useFeatureFlag(flagId: string): boolean {
 
 // React hook for getting all flags
 export function useFeatureFlags(): Record<string, FeatureFlag> {
-  const [flags, setFlags] = React.useState(featureFlags.getAllFlags());
+  const [flags, setFlags] = useState(featureFlags.getAllFlags());
 
-  React.useEffect(() => {
+  useEffect(() => {
     const unsubscribe = featureFlags.subscribe(setFlags);
     return unsubscribe;
   }, []);
