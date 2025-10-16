@@ -383,6 +383,76 @@ class SupabaseClient:
             logger.error("trading_summary_fetch_failed", error=str(e))
             return {}
     
+    def upsert_equity_data(self, df: pd.DataFrame) -> bool:
+        """Upsert equity data (wrapper for insert_equity_data for compatibility).
+        
+        Args:
+            df: DataFrame with equity data
+            
+        Returns:
+            True if successful
+        """
+        try:
+            self.insert_equity_data(df)
+            return True
+        except:
+            return False
+    
+    def upsert_indicators(self, df: pd.DataFrame) -> bool:
+        """Upsert indicator data (wrapper for insert_indicators for compatibility).
+        
+        Args:
+            df: DataFrame with indicator data
+            
+        Returns:
+            True if successful
+        """
+        try:
+            self.insert_indicators(df)
+            return True
+        except:
+            return False
+    
+    def upsert_option_prices(self, df: pd.DataFrame) -> bool:
+        """Upsert option prices into Supabase.
+        
+        Args:
+            df: DataFrame with option price data
+            
+        Returns:
+            True if successful
+        """
+        if df.empty:
+            logger.warning("empty_dataframe_for_option_prices")
+            return False
+        
+        # Convert DataFrame to list of dicts
+        records = df.to_dict("records")
+        
+        # Convert timestamps to ISO format strings
+        for record in records:
+            if 'timestamp' in record:
+                record["timestamp"] = record["timestamp"].isoformat() if hasattr(record["timestamp"], 'isoformat') else record["timestamp"]
+            if 'expiration_date' in record:
+                record["expiration_date"] = str(record["expiration_date"])
+        
+        logger.info("inserting_option_prices", rows=len(records))
+        
+        try:
+            # Upsert to handle duplicates
+            response = self.client.table("option_prices").upsert(
+                records,
+                on_conflict="ticker,timestamp,option_type,strike_price,expiration_date"
+            ).execute()
+            
+            inserted_count = len(response.data) if response.data else 0
+            logger.info("option_prices_inserted", count=inserted_count)
+            return True
+            
+        except Exception as e:
+            logger.error("option_prices_insert_failed", error=str(e))
+            return False
+    
     def test_connection(self) -> bool:
         """Test connection to Supabase.
         

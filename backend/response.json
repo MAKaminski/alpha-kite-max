@@ -1,0 +1,1 @@
+{"errorMessage": "_make_filtering_bound_logger.<locals>.make_method.<locals>.meth() got multiple values for argument 'event'", "errorType": "TypeError", "requestId": "3710c29b-8135-4115-8aa1-00aa7e0c2009", "stackTrace": ["  File \"/var/task/real_time_streamer.py\", line 73, in lambda_handler\n    logger.info(\"lambda_invoked\", event=event)\n"]}

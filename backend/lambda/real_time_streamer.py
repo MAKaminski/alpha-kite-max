@@ -29,6 +29,77 @@ structlog.configure(
 logger = structlog.get_logger()
 
 
+def process_option_chains(option_data: dict, ticker: str, timestamp: str, current_price: float):
+    """Process option chain data to extract nearest ATM strike for 0DTE options.
+    
+    Args:
+        option_data: Raw option chain data from Schwab API
+        ticker: Stock ticker symbol
+        timestamp: Current timestamp
+        current_price: Current stock price
+        
+    Returns:
+        DataFrame with option prices for nearest strike (both CALL and PUT)
+    """
+    import pandas as pd
+    from datetime import date
+    
+    try:
+        # Find nearest strike price (round to nearest $5 for QQQ)
+        nearest_strike = round(current_price / 5) * 5
+        
+        # Get today's date for 0DTE options
+        today = date.today()
+        expiration_str = today.strftime('%Y-%m-%d')
+        
+        options_list = []
+        
+        # Process CALL and PUT maps
+        for option_type in ['callExpDateMap', 'putExpDateMap']:
+            if option_type not in option_data:
+                continue
+                
+            exp_map = option_data[option_type]
+            opt_type = 'CALL' if option_type == 'callExpDateMap' else 'PUT'
+            
+            # Find options for today's expiration
+            for exp_date, strikes in exp_map.items():
+                # Schwab format: "2025-10-16:0" (date:days to expiration)
+                exp_date_only = exp_date.split(':')[0]
+                
+                if exp_date_only != expiration_str:
+                    continue
+                    
+                # Find nearest strike
+                strike_key = f'{nearest_strike:.1f}'
+                if strike_key in strikes:
+                    option_chain = strikes[strike_key][0]  # Get first option contract
+                    
+                    options_list.append({
+                        'ticker': ticker,
+                        'timestamp': timestamp,
+                        'option_type': opt_type,
+                        'strike_price': nearest_strike,
+                        'expiration_date': exp_date_only,
+                        'bid': option_chain.get('bid', 0),
+                        'ask': option_chain.get('ask', 0),
+                        'last': option_chain.get('last', 0),
+                        'volume': option_chain.get('totalVolume', 0),
+                        'open_interest': option_chain.get('openInterest', 0),
+                        'implied_volatility': option_chain.get('volatility', 0),
+                        'delta': option_chain.get('delta', 0),
+                        'gamma': option_chain.get('gamma', 0),
+                        'theta': option_chain.get('theta', 0),
+                        'vega': option_chain.get('vega', 0)
+                    })
+        
+        return pd.DataFrame(options_list)
+        
+    except Exception as e:
+        logger.error("process_option_chains_error", error=str(e))
+        return pd.DataFrame()
+
+
 def is_market_open() -> bool:
     """Check if market is currently open (9:30 AM - 4:00 PM ET, weekdays).
     
@@ -201,6 +272,31 @@ def lambda_handler(event, context):
                 indicator_rows=len(latest_indicators)
             )
         
+        # Download and upload option chain data (0DTE options for nearest strike)
+        option_rows = 0
+        try:
+            current_price = latest_df['price'].iloc[0]
+            logger.info("downloading_option_chains", ticker=ticker, current_price=current_price)
+            
+            # Get 0DTE option chains
+            option_data = schwab_client.get_option_chains(ticker)
+            
+            if option_data:
+                # Process and upload option data
+                option_df = process_option_chains(option_data, ticker, latest_timestamp, current_price)
+                
+                if not option_df.empty:
+                    option_success = supabase_client.upsert_option_prices(option_df)
+                    
+                    if option_success:
+                        option_rows = len(option_df)
+                        logger.info("option_data_uploaded", ticker=ticker, option_rows=option_rows)
+                    else:
+                        logger.warning("option_upload_failed", ticker=ticker)
+        except Exception as e:
+            logger.warning("option_download_error", error=str(e), ticker=ticker)
+            # Don't fail the entire Lambda if option download fails
+        
         # Return success
         return {
             'statusCode': 200,
@@ -209,7 +305,8 @@ def lambda_handler(event, context):
                 'ticker': ticker,
                 'timestamp': latest_timestamp,
                 'equity_rows': len(latest_df),
-                'indicator_rows': len(latest_indicators) if not indicators.empty else 0
+                'indicator_rows': len(latest_indicators) if not indicators.empty else 0,
+                'option_rows': option_rows
             })
         }
         
