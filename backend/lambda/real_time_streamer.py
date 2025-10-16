@@ -15,7 +15,7 @@ from schwab_integration.client import SchwabClient
 from schwab_integration.downloader import EquityDownloader
 from schwab_integration.config import SchwabConfig, SupabaseConfig
 from supabase_client import SupabaseClient
-from lambda.token_manager import TokenManager
+from token_manager import TokenManager
 
 # Configure structured logging
 structlog.configure(
@@ -70,7 +70,7 @@ def lambda_handler(event, context):
     Returns:
         Response with status and metrics
     """
-    logger.info("lambda_invoked", event=event)
+    logger.info("lambda_invoked", lambda_event=event)
     
     try:
         # Check if market is open

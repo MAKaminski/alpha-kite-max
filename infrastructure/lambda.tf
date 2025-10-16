@@ -56,15 +56,14 @@ resource "aws_iam_role_policy" "lambda_policy" {
 
 # Lambda function
 resource "aws_lambda_function" "real_time_streamer" {
-  filename      = "${path.module}/../backend/lambda/lambda_deployment.zip"
+  s3_bucket     = "alpha-kite-max-lambda-deployments-1760618115"
+  s3_key        = "lambda_deployment.zip"
   function_name = "alpha-kite-real-time-streamer"
   role          = aws_iam_role.lambda_role.arn
   handler       = "real_time_streamer.lambda_handler"
   runtime       = "python3.10"
   timeout       = 60
   memory_size   = 256
-
-  source_code_hash = fileexists("${path.module}/../backend/lambda/lambda_deployment.zip") ? filebase64sha256("${path.module}/../backend/lambda/lambda_deployment.zip") : null
 
   environment {
     variables = {
@@ -74,7 +73,6 @@ resource "aws_lambda_function" "real_time_streamer" {
       SCHWAB_APP_SECRET         = var.schwab_secret
       DEFAULT_TICKER            = var.default_ticker
       SCHWAB_TOKEN_SECRET       = aws_secretsmanager_secret.schwab_token.name
-      AWS_REGION                = var.aws_region
     }
   }
 
