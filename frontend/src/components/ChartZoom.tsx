@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import { formatToEST } from '@/lib/timezone';
+import { useState, useRef } from 'react';
 
 interface ChartZoomProps {
   data: { timestamp: string }[];

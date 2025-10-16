@@ -51,10 +51,6 @@ export default function TradingDashboard({ ticker, selectedDate }: TradingDashbo
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchTradingSummary();
-  }, [ticker, selectedDate]);
-
   const fetchTradingSummary = async () => {
     try {
       setLoading(true);
@@ -102,6 +98,11 @@ export default function TradingDashboard({ ticker, selectedDate }: TradingDashbo
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchTradingSummary();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ticker, selectedDate]);
 
   if (loading) {
     return (

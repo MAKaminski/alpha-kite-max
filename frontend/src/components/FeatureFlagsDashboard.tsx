@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { featureFlags, FeatureFlag, useFeatureFlags } from '@/lib/featureFlags';
 
 interface FeatureFlagsDashboardProps {
@@ -55,7 +55,7 @@ export default function FeatureFlagsDashboard({ isOpen, onClose }: FeatureFlagsD
       setImportData('');
       setImportExportOpen(false);
       alert('Feature flags imported successfully!');
-    } catch (error) {
+    } catch {
       alert('Failed to import feature flags. Please check the JSON format.');
     }
   };
@@ -127,7 +127,7 @@ export default function FeatureFlagsDashboard({ isOpen, onClose }: FeatureFlagsD
             {/* Category Filter */}
             <select
               value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value as any)}
+              onChange={(e) => setSelectedCategory(e.target.value as FeatureFlag['category'] | 'all')}
               className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             >
               {categories.map(cat => (

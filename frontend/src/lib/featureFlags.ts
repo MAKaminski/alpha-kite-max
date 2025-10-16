@@ -351,7 +351,7 @@ class FeatureFlagsService {
       this.flags = imported;
       this.saveToStorage();
       this.notifyListeners();
-    } catch (error) {
+    } catch {
       throw new Error('Invalid feature flags JSON');
     }
   }
@@ -365,7 +365,7 @@ export function useFeatureFlag(flagId: string): boolean {
   const [enabled, setEnabled] = React.useState(featureFlags.isEnabled(flagId));
 
   React.useEffect(() => {
-    const unsubscribe = featureFlags.subscribe((flags) => {
+    const unsubscribe = featureFlags.subscribe(() => {
       setEnabled(featureFlags.isEnabled(flagId));
     });
     return unsubscribe;

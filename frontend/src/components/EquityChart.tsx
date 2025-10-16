@@ -40,7 +40,6 @@ export default function EquityChart({
     
     // Only show labels at 30-minute intervals starting from market open (9:30 AM)
     const marketOpenHour = 9;
-    const marketOpenMinute = 30;
     
     // Check if this is a 30-minute interval
     const isMarketHour = hours >= marketOpenHour && hours < 16; // 9:30 AM - 4:00 PM
@@ -78,9 +77,6 @@ export default function EquityChart({
         const cross = (crosses || []).find(c => c.timestamp === point.timestamp);
         const optionPrice = (optionPrices || []).find(op => op.timestamp === point.timestamp);
         const realTimeOption = (realTimeOptionPrices || []).find(rt => rt.timestamp === point.timestamp);
-        
-        // Use real-time option prices if available, otherwise fall back to trade option prices
-        const currentOptionPrice = realTimeOption || optionPrice;
         
         return {
           ...point,

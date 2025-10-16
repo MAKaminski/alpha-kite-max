@@ -65,15 +65,12 @@ export default function Dashboard() {
     const hourlyData: ChartDataPoint[] = Object.entries(hourlyGroups).map(([hourKey, points]) => {
       if (points.length === 0) return null;
       
-      // Calculate OHLC and volume-weighted averages
+      // Calculate volume-weighted averages
       const prices = points.map(p => p.price);
       const volumes = points.map(p => p.volume);
       const sma9Values = points.map(p => p.sma9);
       const vwapValues = points.map(p => p.vwap);
       
-      const open = prices[0];
-      const high = Math.max(...prices);
-      const low = Math.min(...prices);
       const close = prices[prices.length - 1];
       const totalVolume = volumes.reduce((sum, vol) => sum + vol, 0);
       
