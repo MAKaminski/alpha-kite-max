@@ -30,6 +30,17 @@ htmlcov/
 .schwab_tokens.json
 backend/config/schwab_token.json
 
+# Terraform
+infrastructure/.terraform/
+infrastructure/*.tfstate
+infrastructure/*.tfstate.backup
+infrastructure/.terraform.lock.hcl
+infrastructure/terraform.tfvars
+
+# Lambda deployment
+backend/lambda/package/
+backend/lambda/lambda_deployment.zip
+
 # Testing
 coverage/
 .nyc_output
