@@ -1,23 +1,39 @@
 # Schwab OAuth Quick Start
 
-Fast track to getting Schwab API tokens deployed.
+**FULLY AUTOMATED** - No manual copying, pasting, or terminal commands!
 
 ---
 
-## ⚡ Quick Commands
+## ⚡ One-Command OAuth
 
-### 1. Start Callback Server (Terminal 1)
+### Option 1: Super Simple (Recommended)
+
+```bash
+./reauth_schwab.sh
+```
+
+**That's it!** The script will:
+1. ✅ Open browser to Schwab OAuth
+2. ✅ Wait for you to click "Allow"
+3. ✅ Automatically capture callback
+4. ✅ Exchange code for tokens
+5. ✅ Upload to AWS Secrets Manager
+6. ✅ Test API access
+
+**No manual copying or pasting required!**
+
+---
+
+### Option 2: Direct Python
 
 ```bash
 cd backend/sys_testing
-python3 standalone_callback_server.py
+python3 auto_reauth.py
 ```
-
-Keep this running!
 
 ---
 
-### 2. Run OAuth Flow (Terminal 2)
+### Option 3: Manual (Legacy)
 
 ```bash
 cd backend/sys_testing
@@ -29,7 +45,7 @@ open "https://api.schwabapi.com/v1/oauth/authorize?response_type=code&client_id=
 python3 simple_callback_processor.py "PASTE_CALLBACK_URL_HERE"
 ```
 
-⚠️ **You have 30 seconds after authorization!**
+⚠️ **Manual method requires 30-second timing!**
 
 ---
 
