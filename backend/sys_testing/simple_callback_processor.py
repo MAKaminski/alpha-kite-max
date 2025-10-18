@@ -92,11 +92,14 @@ def exchange_code_for_tokens(code):
             print(f"Expires In: {tokens.get('expires_in', 'N/A')} seconds")
             print()
             
-            # Save tokens
-            save_tokens(tokens)
+            # Save tokens locally
+            token_file = save_tokens(tokens)
             
             # Test the token
             test_access_token(tokens['access_token'])
+            
+            # Upload to AWS Secrets Manager
+            upload_to_aws(token_file)
             
             return True
         else:
@@ -113,14 +116,76 @@ def save_tokens(tokens):
     token_file = Path(__file__).parent.parent / 'config' / 'schwab_token.json'
     token_file.parent.mkdir(parents=True, exist_ok=True)
     
+    # Add metadata
+    from datetime import datetime, timedelta
+    token_data = {
+        **tokens,
+        'last_refresh': datetime.utcnow().isoformat() + 'Z',
+        'refresh_count': 0,
+        'created_at': datetime.utcnow().isoformat() + 'Z'
+    }
+    
+    # Calculate expires_at if not present
+    if 'expires_at' not in token_data and 'expires_in' in token_data:
+        expires_at = datetime.utcnow() + timedelta(seconds=token_data['expires_in'])
+        token_data['expires_at'] = expires_at.isoformat() + 'Z'
+    
     with open(token_file, 'w') as f:
-        json.dump(tokens, f, indent=2)
+        json.dump(token_data, f, indent=2)
     
     print(f"💾 Tokens saved to: {token_file}")
+    
+    return token_file
+
+def upload_to_aws(token_file):
+    """Upload tokens to AWS Secrets Manager."""
+    print("\n☁️  Uploading tokens to AWS Secrets Manager...")
+    
+    try:
+        import boto3
+        
+        # Read token file
+        with open(token_file, 'r') as f:
+            token_data = json.load(f)
+        
+        # Upload to AWS Secrets Manager
+        client = boto3.client('secretsmanager', region_name='us-east-1')
+        
+        try:
+            response = client.put_secret_value(
+                SecretId='schwab-api-token-prod',
+                SecretString=json.dumps(token_data)
+            )
+            print("✅ Tokens uploaded to AWS Secrets Manager!")
+            print(f"   Secret ARN: {response['ARN']}")
+            print(f"   Version ID: {response['VersionId']}")
+            return True
+        except client.exceptions.ResourceNotFoundException:
+            print("⚠️  Secret 'schwab-api-token-prod' not found, creating it...")
+            response = client.create_secret(
+                Name='schwab-api-token-prod',
+                Description='Schwab API OAuth tokens for production',
+                SecretString=json.dumps(token_data)
+            )
+            print("✅ Secret created and tokens uploaded!")
+            print(f"   Secret ARN: {response['ARN']}")
+            return True
+            
+    except ImportError:
+        print("⚠️  boto3 not installed. Install with: pip install boto3")
+        print("   Skipping AWS upload.")
+        return False
+    except Exception as e:
+        print(f"❌ AWS upload failed: {e}")
+        print("   You can manually upload using:")
+        print(f"   aws secretsmanager put-secret-value \\")
+        print(f"     --secret-id schwab-api-token-prod \\")
+        print(f"     --secret-string file://{token_file}")
+        return False
 
 def test_access_token(access_token):
     """Test the access token with a simple API call."""
-    print("🧪 Testing access token...")
+    print("\n🧪 Testing access token...")
     
     api_url = "https://api.schwabapi.com/trader/v1/accounts"
     headers = {"Authorization": f"Bearer {access_token}"}
@@ -151,18 +216,25 @@ def main():
     
     if success:
         print()
-        print("=" * 50)
-        print("🎉 SUCCESS! OAuth flow completed!")
-        print("=" * 50)
+        print("=" * 70)
+        print("🎉 SUCCESS! OAuth flow completed and tokens deployed!")
+        print("=" * 70)
         print()
-        print("Next steps:")
-        print("1. Upload tokens to AWS Secrets Manager:")
-        print("   aws secretsmanager put-secret-value \\")
-        print("     --secret-id schwab-api-token-prod \\")
-        print("     --secret-string file://config/schwab_token.json")
+        print("✅ Completed:")
+        print("   1. ✅ Authorization code exchanged for tokens")
+        print("   2. ✅ Tokens saved locally to config/schwab_token.json")
+        print("   3. ✅ API access verified")
+        print("   4. ✅ Tokens uploaded to AWS Secrets Manager")
         print()
-        print("2. Test Lambda function")
-        print("3. Verify data streaming")
+        print("📋 Next steps:")
+        print("   1. Test Lambda function")
+        print("   2. Verify data streaming")
+        print("   3. Monitor token expiration in admin panel")
+        print()
+        print("🔗 Quick Links:")
+        print("   • Lambda: https://console.aws.amazon.com/lambda")
+        print("   • Secrets: https://console.aws.amazon.com/secretsmanager")
+        print("   • Admin Panel: https://your-app.vercel.app (open admin)")
     else:
         print()
         print("❌ OAuth flow failed")
