@@ -42,7 +42,7 @@ export default function TokenManagement({ className = '' }: TokenManagementProps
       } else {
         setError('Failed to fetch token status');
       }
-    } catch (err) {
+    } catch {
       setError('Error fetching token status');
     } finally {
       setLoading(false);
@@ -68,7 +68,7 @@ export default function TokenManagement({ className = '' }: TokenManagementProps
         const errorData = await response.json();
         setError(`Failed to refresh token: ${errorData.error}`);
       }
-    } catch (err) {
+    } catch {
       setError('Error refreshing token');
     } finally {
       setRefreshing(false);
@@ -275,10 +275,10 @@ export default function TokenManagement({ className = '' }: TokenManagementProps
           If automatic refresh fails, use manual re-authorization:
         </p>
         <ol className="text-sm text-blue-700 dark:text-blue-300 list-decimal list-inside space-y-1">
-          <li>Click "Re-Authorize" to open OAuth URL</li>
+          <li>Click &quot;Re-Authorize&quot; to open OAuth URL</li>
           <li>Complete authorization in the new tab</li>
           <li>Copy the callback URL from your browser</li>
-          <li>Run: <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">python3 simple_callback_processor.py "&lt;CALLBACK_URL&gt;"</code></li>
+          <li>Run: <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">python3 simple_callback_processor.py &quot;&lt;CALLBACK_URL&gt;&quot;</code></li>
         </ol>
       </div>
     </div>

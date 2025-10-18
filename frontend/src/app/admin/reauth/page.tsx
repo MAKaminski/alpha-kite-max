@@ -98,7 +98,7 @@ export default function ReauthPage() {
             </h2>
             <div className="space-y-4">
               <p className="text-gray-600 dark:text-gray-400">
-                After authorizing the app, you'll be redirected to a callback URL. Copy the entire URL from your browser's address bar.
+                After authorizing the app, you&apos;ll be redirected to a callback URL. Copy the entire URL from your browser&apos;s address bar.
               </p>
               <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
                 <div className="font-medium text-yellow-900 dark:text-yellow-200 mb-2">Expected Callback URL Format:</div>
@@ -204,7 +204,7 @@ export default function ReauthPage() {
               <div className="text-sm text-blue-800 dark:text-blue-300">
                 For manual processing, run: 
                 <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded ml-1">
-                  python3 simple_callback_processor.py "&lt;CALLBACK_URL&gt;"
+                  python3 simple_callback_processor.py &quot;&lt;CALLBACK_URL&gt;&quot;
                 </code>
               </div>
             </div>

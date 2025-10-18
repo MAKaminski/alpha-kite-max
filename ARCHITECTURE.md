@@ -120,6 +120,48 @@
 
 ## Component Details
 
+### 0. Backend Project Structure
+
+The Python backend is organized into several key directories:
+
+**`backend/schwab_integration/`**: Schwab API integration layer
+- `client.py`: Wrapper around schwab-py official client
+- `downloader.py`: Historical data download orchestration
+- `streaming.py`: Real-time data streaming logic
+- `config.py`: Configuration models using Pydantic
+- `trading_engine.py`: Trading execution engine
+
+**`backend/models/`**: Pydantic data models
+- `trading.py`: Trading-related models (positions, orders, P&L)
+
+**`backend/tests/`**: Test suites
+- `test_schwab/`: Unit tests for Schwab integration
+- `test_supabase/`: Unit tests for database operations
+- `integration/`: End-to-end integration tests
+- `test_paper_trading.py`: Paper trading system tests
+- `test_current_day.py`: Current trading day tests
+- `fortified_test_suite.py`: Comprehensive test suite
+
+**`backend/sys_testing/`**: System testing and ad-hoc utilities
+- OAuth scripts: `auto_reauth.py`, `reauth_schwab.py`, `get_auth_url.py`
+- Diagnostics: `token_diagnostics.py`, `check_data_status.py`
+- Utilities: `download_missing_data.py`, `fortified_token_manager.py`
+- See `backend/sys_testing/README.md` for detailed documentation
+
+**`backend/lambda/`**: AWS Lambda deployment
+- `real_time_streamer.py`: Lambda function handler
+- `token_manager.py`: Token refresh logic
+- `monitoring.py`: CloudWatch metrics utilities
+- `deploy_*.sh`: Deployment scripts using `uv`
+
+**`backend/`** (root):
+- `main.py`: CLI entry point for data download
+- `trading_main.py`: CLI entry point for paper trading
+- `etl_pipeline.py`: ETL orchestration
+- `supabase_client.py`: Database CRUD operations
+
+---
+
 ### 1. Frontend (Vercel + Next.js)
 
 #### Technology Stack
@@ -241,11 +283,12 @@ CREATE POLICY "Public read access" ON indicators
 |----------|-------|
 | **Name** | `alpha-kite-real-time-streamer` |
 | **Runtime** | Python 3.10 |
-| **Handler** | `real_time_streamer.lambda_handler` |
+| **Handler** | `lambda.real_time_streamer.lambda_handler` |
 | **Memory** | 256 MB |
 | **Timeout** | 60 seconds |
 | **Package Size** | ~80 MB (with dependencies) |
 | **Concurrency** | 1 (no concurrent executions) |
+| **Deployment** | Via `backend/lambda/deploy_uv.sh` using `uv` for fast builds |
 
 #### Execution Flow
 
@@ -703,6 +746,8 @@ cd backend
 
 ## Security & Access Control
 
+⚠️ **See [SECURITY.md](./SECURITY.md) for comprehensive security guidelines and best practices.**
+
 ### AWS IAM Permissions
 
 **Lambda Execution Role**: `alpha-kite-real-time-streamer-role`
@@ -738,6 +783,8 @@ cd backend
 }
 ```
 
+**Security Principle:** Least privilege access - Lambda only has permissions for its specific operations.
+
 ### Supabase Access Control
 
 **Service Role Key** (Backend):
@@ -754,8 +801,12 @@ cd backend
 
 - **Protocol**: OAuth 2.0 Authorization Code Flow
 - **Token Lifespan**: 7 days (access token), 90 days (refresh token)
-- **Storage**: AWS Secrets Manager (encrypted at rest)
+- **Storage**: AWS Secrets Manager (encrypted at rest) for production; local `.schwab_tokens.json` for development
 - **Rotation**: Automatic refresh via Lambda when expiration detected
+- **Manual Refresh**: Use `backend/sys_testing/auto_reauth.py` for local re-authentication
+- **Token Diagnostics**: Use `backend/sys_testing/token_diagnostics.py` to check token health
+
+**Important:** Never commit token files to Git. See [SECURITY.md](./SECURITY.md) for credential management guidelines.
 
 ---
 
@@ -904,8 +955,24 @@ fields @timestamp, equity_rows, indicator_rows
 }
 ```
 
-### Backend (Lambda)
+### Backend (Local Development)
 
+**Package Manager:** `uv` (ultra-fast Python package manager) [[memory:6995111]]
+
+```bash
+# Install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Create virtual environment
+cd backend
+uv venv
+source .venv/bin/activate  # or `venv\Scripts\activate` on Windows
+
+# Install dependencies
+uv pip install -r requirements.txt
+```
+
+**Dependencies:**
 ```
 schwab-py==1.5.1
 supabase==2.22.0
@@ -918,6 +985,23 @@ pytz==2025.2
 pydantic==2.12.2
 pydantic-settings==2.11.0
 ```
+
+### Backend (Lambda)
+
+**Deployment Tool:** `uv` for 10-100x faster package installation
+
+**Minimal Runtime Dependencies** (Lambda-optimized):
+```
+schwab-py==1.5.1
+supabase==2.22.0
+boto3==1.40.53
+structlog==25.4.0
+python-dateutil==2.9.0
+pytz==2025.2
+pydantic==2.12.2
+```
+
+**Note:** Heavy dependencies (pandas, numpy) excluded for smaller Lambda package size unless required for specific Lambda functions.
 
 ### Infrastructure
 

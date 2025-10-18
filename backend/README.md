@@ -76,6 +76,8 @@ python main.py --ticker SPY --days 10
 
 Run all tests:
 ```bash
+cd backend
+source venv/bin/activate  # or .venv/bin/activate
 pytest
 ```
 
@@ -89,6 +91,15 @@ pytest tests/test_schwab/
 
 # Integration tests only
 pytest tests/integration/
+
+# Paper trading tests
+pytest tests/test_paper_trading.py
+
+# Current day tests
+pytest tests/test_current_day.py
+
+# Comprehensive test suite
+pytest tests/fortified_test_suite.py
 ```
 
 With coverage:
@@ -96,21 +107,57 @@ With coverage:
 pytest --cov=. --cov-report=html
 ```
 
+## System Testing & Utilities
+
+The `sys_testing/` directory contains ad-hoc scripts for debugging, authentication, and maintenance:
+
+### OAuth & Authentication
+- `auto_reauth.py`: Automated Schwab OAuth re-authentication
+- `reauth_schwab.py`: Manual re-authentication flow
+- `get_auth_url.py`: Generate OAuth authorization URL
+- `process_callback.py`: Process OAuth callback and save tokens
+- `refresh_schwab_auth.py`: Refresh existing tokens
+
+### Diagnostics
+- `token_diagnostics.py`: Check token health and expiration
+- `check_data_status.py`: Verify data integrity in Supabase
+- `download_missing_data.py`: Backfill missing historical data
+- `fortified_token_manager.py`: Production-ready token management
+
+See `sys_testing/README.md` for detailed usage instructions.
+
 ## Architecture
 
 ```
 backend/
-├── schwab/              # Schwab API integration
+├── schwab_integration/  # Schwab API integration
 │   ├── client.py       # API client wrapper
-│   ├── downloader.py   # Data downloader
-│   └── config.py       # Configuration models
+│   ├── downloader.py   # Historical data downloader
+│   ├── streaming.py    # Real-time streaming
+│   ├── config.py       # Configuration models
+│   └── trading_engine.py # Trading execution
+├── models/             # Pydantic data models
+│   └── trading.py      # Trading models
+├── tests/              # Test suites
+│   ├── test_schwab/    # Schwab API tests
+│   ├── test_supabase/  # Database tests
+│   ├── integration/    # Integration tests
+│   ├── test_paper_trading.py
+│   ├── test_current_day.py
+│   └── fortified_test_suite.py
+├── sys_testing/        # System testing & ad-hoc utilities
+│   ├── auto_reauth.py  # Automated OAuth re-auth
+│   ├── token_diagnostics.py # Token health checks
+│   ├── check_data_status.py # Data integrity
+│   └── README.md       # Utilities documentation
+├── lambda/             # AWS Lambda deployment
+│   ├── real_time_streamer.py # Lambda handler
+│   ├── token_manager.py      # Token management
+│   └── deploy_*.sh           # Deployment scripts
 ├── supabase_client.py  # Supabase CRUD operations
 ├── etl_pipeline.py     # ETL orchestration
-├── main.py             # CLI entry point
-└── tests/              # Test suites
-    ├── test_schwab/
-    ├── test_supabase/
-    └── integration/
+├── main.py             # CLI entry point (data download)
+└── trading_main.py     # CLI entry point (trading)
 ```
 
 ## Data Flow
@@ -121,10 +168,52 @@ backend/
 
 ## Dependencies
 
+Core dependencies:
 - `schwab-py`: Official Schwab API Python client
 - `supabase`: Supabase Python client
-- `pandas`: Data manipulation
-- `pydantic`: Configuration management
+- `pandas`: Data manipulation and indicator calculation
+- `pydantic`: Configuration and data model validation
 - `pytest`: Testing framework
 - `structlog`: Structured logging
+- `boto3`: AWS SDK (for Lambda and Secrets Manager)
+- `pytz`: Timezone handling
+
+### Package Management
+
+This project uses `uv` for faster package installation:
+
+```bash
+# Install uv (if not already installed)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Create virtual environment
+cd backend
+uv venv
+source .venv/bin/activate  # or `venv\Scripts\activate` on Windows
+
+# Install dependencies (10-100x faster than pip)
+uv pip install -r requirements.txt
+```
+
+**Why uv?**
+- 10-100x faster than pip for package resolution
+- Better dependency conflict detection
+- More efficient package caching
+- Drop-in replacement for pip
+
+## Security
+
+⚠️ **Important**: Never commit credentials or tokens to Git!
+
+See [SECURITY.md](../SECURITY.md) for:
+- Credential management best practices
+- OAuth token handling
+- Environment variable setup
+- AWS Secrets Manager configuration
+
+**Quick checklist:**
+- [ ] `.env` file is in `.gitignore`
+- [ ] `.schwab_tokens.json` is in `.gitignore`
+- [ ] Use `env.example` as template, never commit `.env`
+- [ ] Set file permissions: `chmod 600 .env`
 

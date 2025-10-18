@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { formatToEST } from '@/lib/timezone';
 import { useFeatureFlag } from '@/lib/featureFlags';
-import { TokenRefresh } from './TokenRefresh';
 import TokenManagement from './TokenManagement';
 
 interface SystemMetrics {

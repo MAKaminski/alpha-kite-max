@@ -85,7 +85,7 @@ export default function TokenManagementPage() {
               <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded">
                 <div className="font-medium text-red-800 dark:text-red-200">Token Expired</div>
                 <div className="text-red-600 dark:text-red-300">
-                  Click "Re-Authorize" to get new tokens
+                  Click &quot;Re-Authorize&quot; to get new tokens
                 </div>
               </div>
               <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded">

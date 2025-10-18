@@ -134,30 +134,62 @@ See `backend/README.md` for detailed documentation.
 
 ```
 alpha-kite-max/
-├── frontend/          # Next.js application
+├── frontend/               # Next.js application
 │   ├── src/
-│   │   ├── app/       # App router pages
-│   │   ├── components/# React components
-│   │   └── lib/       # Utilities and configs
-├── backend/           # Python services
-│   ├── schwab/       # Schwab API integration
-│   ├── tests/        # Test suites
-│   └── main.py       # CLI entry point
-├── supabase/         # Database migrations
-│   └── migrations/   # SQL migration files
-├── shared/           # Shared types and configs
-├── context/          # Project documentation
-└── vercel.json       # Vercel configuration
+│   │   ├── app/           # App router pages
+│   │   ├── components/    # React components
+│   │   ├── contexts/      # React contexts
+│   │   └── lib/           # Utilities and configs
+├── backend/               # Python services
+│   ├── schwab_integration/# Schwab API integration
+│   │   ├── client.py     # API client wrapper
+│   │   ├── downloader.py # Data downloader
+│   │   └── streaming.py  # Real-time streaming
+│   ├── models/           # Pydantic data models
+│   ├── tests/            # Test suites
+│   │   ├── integration/  # Integration tests
+│   │   ├── test_schwab/  # Schwab API tests
+│   │   └── test_supabase/# Database tests
+│   ├── sys_testing/      # System testing & utilities
+│   │   ├── OAuth scripts # Authentication helpers
+│   │   └── Diagnostic tools
+│   ├── lambda/           # AWS Lambda deployment
+│   ├── main.py           # CLI entry point
+│   └── etl_pipeline.py   # ETL orchestration
+├── infrastructure/        # Terraform IaC
+│   ├── lambda.tf         # Lambda function config
+│   ├── cloudwatch_alarms.tf
+│   └── secrets.tf        # AWS Secrets Manager
+├── supabase/             # Database migrations
+│   └── migrations/       # SQL migration files
+├── shared/               # Shared TypeScript types
+├── context/              # Project documentation
+│   └── docs/            # Detailed guides
+├── SECURITY.md          # Security policy
+└── vercel.json          # Vercel configuration
 ```
 
 ## Documentation
 
+### Core Documentation
 - **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Complete system architecture and technical specifications
+- **[SECURITY.md](./SECURITY.md)** - Security policy and credential management best practices
+
+### Setup & Deployment
 - **[Quick Start Guide](./context/docs/QUICKSTART_AWS.md)** - Get up and running in 15 minutes
 - **[Deployment Guide](./context/docs/DEPLOYMENT.md)** - Production deployment instructions
 - **[AWS Deployment](./context/docs/DEPLOYMENT_AWS.md)** - Detailed AWS Lambda setup
+- **[Vercel Deployment](./context/docs/VERCEL_DEPLOYMENT.md)** - Frontend deployment guide
+
+### Development Guides
+- **[Backend README](./backend/README.md)** - Python backend setup and usage
+- **[Frontend README](./frontend/README.md)** - Next.js frontend development
+- **[Infrastructure README](./infrastructure/README.md)** - Terraform configuration
+
+### Status & Progress
 - **[Implementation Status](./context/docs/IMPLEMENTATION_STATUS.md)** - Current feature status
 - **[Progress Summary](./context/docs/PROGRESS_SUMMARY.md)** - Latest development progress
+- **[Supabase Migrations](./context/docs/SUPABASE_MIGRATIONS.md)** - Database schema history
 
 ## License
 
