@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { formatToEST } from '@/lib/timezone';
 import { useFeatureFlag } from '@/lib/featureFlags';
 import { TokenRefresh } from './TokenRefresh';
+import TokenManagement from './TokenManagement';
 
 interface SystemMetrics {
   // Health
@@ -340,9 +341,9 @@ export default function AdminPanelSimplified({ isOpen, onClose }: AdminPanelProp
               </div>
             </div>
 
-            {/* Token Refresh */}
+            {/* Token Management */}
             <div className="lg:col-span-2">
-              <TokenRefresh />
+              <TokenManagement />
             </div>
 
           </div>
