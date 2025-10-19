@@ -9,6 +9,7 @@ interface SystemMetrics {
   // Health
   supabaseConnected: boolean;
   schwabTokenValid: boolean;
+  polygonApiConnected: boolean;
   lambdaSuccessRate: number;
   
   // Market
@@ -52,6 +53,7 @@ export default function AdminPanelSimplified({ isOpen, onClose }: AdminPanelProp
       setMetrics({
         supabaseConnected: true,
         schwabTokenValid: false, // Currently invalid
+        polygonApiConnected: true, // Polygon.io configured
         lambdaSuccessRate: 0,
         isMarketOpen: true,
         currentTime: new Date().toISOString(),
@@ -120,6 +122,12 @@ export default function AdminPanelSimplified({ isOpen, onClose }: AdminPanelProp
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Schwab API Token</span>
                   <span className={`text-sm font-bold ${getStatusColor(metrics.schwabTokenValid)}`}>
                     {getStatusIcon(metrics.schwabTokenValid)} {metrics.schwabTokenValid ? 'Valid' : 'EXPIRED - RE-AUTH NEEDED'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Polygon.io API</span>
+                  <span className={`text-sm font-bold ${getStatusColor(metrics.polygonApiConnected)}`}>
+                    {getStatusIcon(metrics.polygonApiConnected)} {metrics.polygonApiConnected ? 'Connected' : 'NOT CONFIGURED'}
                   </span>
                 </div>
                 <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded">

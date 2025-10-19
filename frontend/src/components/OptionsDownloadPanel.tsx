@@ -20,16 +20,34 @@ export default function OptionsDownloadPanel({ ticker, selectedDate }: OptionsDo
   const [dailyHigh, setDailyHigh] = useState<number | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadStatus, setDownloadStatus] = useState<string>('');
+  const [downloadMode, setDownloadMode] = useState<'single' | 'range'>('single');
+  const [downloadTarget, setDownloadTarget] = useState<'database' | 'csv'>('database');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const autoGenerateStrikes = true; // Always auto-generate strikes based on daily range
+
+  // Set default dates
+  useEffect(() => {
+    const today = selectedDate.toISOString().split('T')[0];
+    setEndDate(today);
+    
+    const weekAgo = new Date(selectedDate);
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    setStartDate(weekAgo.toISOString().split('T')[0]);
+  }, [selectedDate]);
 
   // Generate strike prices based on daily range
   useEffect(() => {
     const generateStrikes = async () => {
       if (!autoGenerateStrikes) return;
       
+      const targetDate = downloadMode === 'single' 
+        ? selectedDate.toISOString().split('T')[0]
+        : endDate;
+      
       try {
         // Fetch daily price data from Supabase to determine range
-        const response = await fetch(`/api/get-daily-range?ticker=${ticker}&date=${selectedDate.toISOString().split('T')[0]}`);
+        const response = await fetch(`/api/get-daily-range?ticker=${ticker}&date=${targetDate}`);
         
         if (response.ok) {
           const { low, high } = await response.json();
@@ -61,7 +79,7 @@ export default function OptionsDownloadPanel({ ticker, selectedDate }: OptionsDo
     };
 
     generateStrikes();
-  }, [ticker, selectedDate, autoGenerateStrikes]);
+  }, [ticker, selectedDate, downloadMode, endDate, autoGenerateStrikes]);
 
   const setDefaultStrikes = () => {
     // Default QQQ strikes around $600
@@ -102,7 +120,7 @@ export default function OptionsDownloadPanel({ ticker, selectedDate }: OptionsDo
     const selectedStrikes = strikes.filter(s => s.selected).map(s => s.strike);
     
     if (selectedStrikes.length === 0) {
-      setDownloadStatus('❌ Please select at least one strike');
+      setDownloadStatus('❌ Select strikes first');
       setTimeout(() => setDownloadStatus(''), 3000);
       return;
     }
@@ -111,22 +129,46 @@ export default function OptionsDownloadPanel({ ticker, selectedDate }: OptionsDo
     setDownloadStatus(`Downloading ${selectedStrikes.length} strikes...`);
 
     try {
+      const payload = {
+        ticker,
+        mode: downloadMode,
+        target: downloadTarget,
+        strikes: selectedStrikes,
+        ...(downloadMode === 'single' 
+          ? { date: selectedDate.toISOString().split('T')[0] } 
+          : { startDate, endDate })
+      };
+
       const response = await fetch('/api/download-options', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ticker,
-          date: selectedDate.toISOString().split('T')[0],
-          strikes: selectedStrikes
-        })
+        body: JSON.stringify(payload)
       });
 
       const result = await response.json();
 
       if (response.ok) {
-        setDownloadStatus(`✅ Downloaded ${result.rowCount || 0} rows for ${selectedStrikes.length} strikes`);
+        if (downloadTarget === 'csv') {
+          // Trigger CSV download
+          const blob = new Blob([result.csvData || ''], { type: 'text/csv' });
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          const dateStr = downloadMode === 'single' 
+            ? selectedDate.toISOString().split('T')[0]
+            : `${startDate}_to_${endDate}`;
+          a.download = `${ticker}_options_${dateStr}.csv`;
+          document.body.appendChild(a);
+          a.click();
+          window.URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+          
+          setDownloadStatus(`✅ CSV downloaded! ${result.rowCount || 0} rows`);
+        } else {
+          setDownloadStatus(`✅ ${result.rowCount || 0} rows saved to DB`);
+        }
       } else {
-        setDownloadStatus(`❌ Error: ${result.error || 'Download failed'}`);
+        setDownloadStatus(`❌ Error: ${result.error || 'Failed'}`);
       }
     } catch (error) {
       setDownloadStatus(`❌ Error: ${error instanceof Error ? error.message : 'Network error'}`);
@@ -149,15 +191,76 @@ export default function OptionsDownloadPanel({ ticker, selectedDate }: OptionsDo
         </span>
       </h3>
 
-      {/* Date Info */}
-      <div className="mb-1 p-1 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
-        <p className="text-[9px] text-blue-800 dark:text-blue-300">
-          <strong>Date:</strong> {formatToEST(selectedDate, 'MMM dd, yyyy')}
-        </p>
-        <p className="text-[9px] text-blue-800 dark:text-blue-300">
-          <strong>Ticker:</strong> {ticker} (0DTE expires this date)
-        </p>
+      {/* Download Mode & Target */}
+      <div className="mb-1 flex gap-1">
+        <div className="flex gap-1 flex-1">
+          <label className="flex items-center">
+            <input
+              type="radio"
+              checked={downloadMode === 'single'}
+              onChange={() => setDownloadMode('single')}
+              className="mr-0.5"
+            />
+            <span className="text-[9px] text-gray-700 dark:text-gray-300">Day</span>
+          </label>
+          <label className="flex items-center">
+            <input
+              type="radio"
+              checked={downloadMode === 'range'}
+              onChange={() => setDownloadMode('range')}
+              className="mr-0.5"
+            />
+            <span className="text-[9px] text-gray-700 dark:text-gray-300">Range</span>
+          </label>
+        </div>
+        <div className="flex gap-1 flex-1">
+          <label className="flex items-center">
+            <input
+              type="radio"
+              checked={downloadTarget === 'database'}
+              onChange={() => setDownloadTarget('database')}
+              className="mr-0.5"
+            />
+            <span className="text-[9px] text-gray-700 dark:text-gray-300">DB</span>
+          </label>
+          <label className="flex items-center">
+            <input
+              type="radio"
+              checked={downloadTarget === 'csv'}
+              onChange={() => setDownloadTarget('csv')}
+              className="mr-0.5"
+            />
+            <span className="text-[9px] text-gray-700 dark:text-gray-300">CSV</span>
+          </label>
+        </div>
       </div>
+
+      {/* Date Inputs */}
+      {downloadMode === 'single' ? (
+        <div className="mb-1 p-1 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
+          <p className="text-[9px] text-blue-800 dark:text-blue-300">
+            <strong>Date:</strong> {formatToEST(selectedDate, 'MMM dd, yyyy')}
+          </p>
+          <p className="text-[9px] text-blue-800 dark:text-blue-300">
+            0DTE expires this date
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-1 mb-1">
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="w-full px-1 py-0.5 text-[10px] border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+          />
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="w-full px-1 py-0.5 text-[10px] border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+          />
+        </div>
+      )}
 
       {/* Quick Actions */}
       <div className="mb-1 flex gap-1">
