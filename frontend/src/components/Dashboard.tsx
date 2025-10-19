@@ -1,21 +1,22 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Cross, detectCrosses, filterCrossesByDate } from '@/lib/crossDetection';
+import { useFeatureFlag } from '@/lib/featureFlags';
+import { getTradeOptionPrices, TradeOptionPrice } from '@/lib/optionPrices';
+import { RealTimeOptionPrice, realTimeOptionsService } from '@/lib/realTimeOptions';
+import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import { formatToEST } from '@/lib/timezone';
+import { useEffect, useState } from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { ChartDataPoint } from '../../../shared/types';
-import { detectCrosses, filterCrossesByDate, Cross } from '@/lib/crossDetection';
-import { formatToEST } from '@/lib/timezone';
-import { getTradeOptionPrices, TradeOptionPrice } from '@/lib/optionPrices';
-import { realTimeOptionsService, RealTimeOptionPrice } from '@/lib/realTimeOptions';
-import { useFeatureFlag } from '@/lib/featureFlags';
+import AdminPanelSimplified from './AdminPanelSimplified';
+import DataManagementDashboard from './DataManagementDashboard';
+import DarkModeToggle from './DarkModeToggle';
 import EquityChart from './EquityChart';
 import ESTClock from './ESTClock';
 import SignalsDashboard from './SignalsDashboard';
 import TradingDashboard from './TradingDashboard';
-import AdminPanelSimplified from './AdminPanelSimplified';
-import DarkModeToggle from './DarkModeToggle';
 
 export default function Dashboard() {
   const [ticker, setTicker] = useState('QQQ');

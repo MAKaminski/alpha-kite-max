@@ -1,13 +1,13 @@
 'use client';
 
-import React from 'react';
-import { Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceArea, Scatter, ComposedChart, Bar, BarChart } from 'recharts';
-import { ChartDataPoint } from '../../../shared/types';
 import { Cross } from '@/lib/crossDetection';
-import { formatToEST } from '@/lib/timezone';
 import { getMarketHoursSegments, isRegularTradingHours } from '@/lib/marketHours';
 import { TradeOptionPrice, getOptionPriceColor, getOptionPriceSymbol } from '@/lib/optionPrices';
 import { RealTimeOptionPrice } from '@/lib/realTimeOptions';
+import { formatToEST } from '@/lib/timezone';
+import React from 'react';
+import { Bar, BarChart, CartesianGrid, ComposedChart, Legend, Line, ReferenceArea, ResponsiveContainer, Scatter, Tooltip, XAxis, YAxis } from 'recharts';
+import { ChartDataPoint } from '../../../shared/types';
 
 interface EquityChartProps {
   data: ChartDataPoint[];
