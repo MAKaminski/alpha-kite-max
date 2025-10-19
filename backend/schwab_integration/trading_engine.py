@@ -16,8 +16,14 @@ from decimal import Decimal
 
 from .client import SchwabClient
 from .config import SchwabConfig
-from ..supabase_client import SupabaseClient
-from ..models.trading import Position, Trade, TradingSignal, DailyPnL
+
+# Import from parent package
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from supabase_client import SupabaseClient
+from models.trading import Position, Trade, TradingSignal, DailyPnL
 
 logger = logging.getLogger(__name__)
 
@@ -103,10 +109,15 @@ class TradingEngine:
     def _is_trading_allowed(self, timestamp: str) -> bool:
         """Check if trading is allowed at this time (not 30 mins before close)."""
         dt = pd.to_datetime(timestamp)
-        est_time = dt.tz_convert('America/New_York')
         
-        # Market close is 4:00 PM EST, stop trading at 3:30 PM EST
-        market_close = est_time.replace(hour=16, minute=0, second=0, microsecond=0)
+        # Handle timezone-naive timestamps
+        if dt.tz is None:
+            est_time = dt.tz_localize('America/New_York')
+        else:
+            est_time = dt.tz_convert('America/New_York')
+        
+        # Market close is 3:00 PM EST, stop trading at 2:30 PM EST
+        market_close = est_time.replace(hour=15, minute=0, second=0, microsecond=0)
         stop_trading = market_close - timedelta(minutes=30)
         
         return est_time < stop_trading
@@ -358,6 +369,39 @@ class TradingEngine:
         except Exception as e:
             logger.error("0dte_option_chain_failed", error=str(e))
             return {}
+    
+    def _find_nearest_put_strike(self, ticker: str, current_price: float) -> Optional[float]:
+        """Find nearest put strike below current price with good liquidity."""
+        try:
+            # Get option chains for puts
+            option_chains = self.schwab_client.get_option_chains(ticker, "PUT")
+            
+            if not option_chains or 'putExpDateMap' not in option_chains:
+                # Fallback to simple calculation
+                return float(int(current_price) - 1)
+            
+            # Find puts with strikes below current price and good liquidity
+            best_strike = None
+            best_liquidity = 0
+            
+            for exp_date, strikes in option_chains.items():
+                for strike, contracts in strikes.items():
+                    strike_price = float(strike)
+                    if strike_price < current_price:
+                        # Check liquidity (volume + open interest)
+                        total_liquidity = 0
+                        for contract in contracts:
+                            total_liquidity += contract.get('totalVolume', 0) + contract.get('openInterest', 0)
+                        
+                        if total_liquidity > best_liquidity:
+                            best_liquidity = total_liquidity
+                            best_strike = strike_price
+            
+            return best_strike if best_strike else float(int(current_price) - 1)
+            
+        except Exception as e:
+            logger.error("put_strike_search_failed", error=str(e))
+            return float(int(current_price) - 1)
     
     def _find_nearest_call_strike(self, ticker: str, current_price: float) -> Optional[float]:
         """Find nearest call strike above current price with good liquidity."""

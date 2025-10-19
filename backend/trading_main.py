@@ -240,10 +240,10 @@ class TradingBot:
         if timestamp.weekday() >= 5:  # Weekend
             return False
         
-        # Market hours: 9:30 AM - 4:00 PM EST
+        # Market hours: 10:00 AM - 3:00 PM EST
         est_time = timestamp.replace(tzinfo=None)  # Assume local time is EST for now
-        market_open = est_time.replace(hour=9, minute=30, second=0, microsecond=0)
-        market_close = est_time.replace(hour=16, minute=0, second=0, microsecond=0)
+        market_open = est_time.replace(hour=10, minute=0, second=0, microsecond=0)
+        market_close = est_time.replace(hour=15, minute=0, second=0, microsecond=0)
         
         return market_open <= est_time < market_close
 

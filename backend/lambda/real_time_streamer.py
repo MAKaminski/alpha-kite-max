@@ -101,7 +101,7 @@ def process_option_chains(option_data: dict, ticker: str, timestamp: str, curren
 
 
 def is_market_open() -> bool:
-    """Check if market is currently open (9:30 AM - 4:00 PM ET, weekdays).
+    """Check if market is currently open (10:00 AM - 3:00 PM ET, weekdays).
     
     Returns:
         True if market is open, False otherwise
@@ -114,9 +114,9 @@ def is_market_open() -> bool:
     if now_est.weekday() >= 5:  # Saturday or Sunday
         return False
     
-    # Check if within market hours (9:30 AM - 4:00 PM)
-    market_open = time(9, 30)
-    market_close = time(16, 0)
+    # Check if within market hours (10:00 AM - 3:00 PM)
+    market_open = time(10, 0)
+    market_close = time(15, 0)
     current_time = now_est.time()
     
     is_open = market_open <= current_time < market_close

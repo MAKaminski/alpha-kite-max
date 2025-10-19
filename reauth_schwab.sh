@@ -1,6 +1,6 @@
 #!/bin/bash
 # One-Command Schwab OAuth Re-Authorization
-# Usage: ./reauth_schwab.sh
+# Usage: ./fully_auto_reauth.sh
 
 echo "🤖 Schwab OAuth Re-Authorization"
 echo "   Fully automated - no manual copying required!"

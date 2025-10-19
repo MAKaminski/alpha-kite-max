@@ -59,7 +59,7 @@ class TestRealTimeStreaming:
             
             # Test price history for today (1 day period)
             ticker = "QQQ"
-            response = schwab_client.get_price_history(
+            data = schwab_client.get_price_history(
                 symbol=ticker,
                 period_type="day",
                 period=1,
@@ -67,10 +67,10 @@ class TestRealTimeStreaming:
                 frequency=1
             )
             
-            assert response.status_code == 200, f"API call failed: {response.status_code}"
-            print(f"✅ Schwab API returned status 200 for {ticker}")
+            # get_price_history returns dict, not response object
+            assert data is not None, "API call returned None"
+            print(f"✅ Schwab API returned data for {ticker}")
             
-            data = response.json()
             candles = data.get('candles', [])
             
             print(f"\n📊 Current Day Data Summary:")
@@ -138,7 +138,8 @@ class TestRealTimeStreaming:
                 
                 # Check if data is from today
                 today = datetime.now().date()
-                data_date = datetime.fromisoformat(first_timestamp.replace('Z', '+00:00')).date()
+                # first_timestamp is already a pandas Timestamp object
+                data_date = first_timestamp.date() if hasattr(first_timestamp, 'date') else first_timestamp
                 
                 print(f"\n   Today's date: {today}")
                 print(f"   Data from: {data_date}")
@@ -242,42 +243,34 @@ class TestRealTimeStreaming:
             # Verify data was uploaded
             print("\n🔍 Verifying uploaded data...")
             
-            # Get today's date range
-            today = datetime.now().date()
-            start_date = datetime.combine(today, datetime.min.time())
-            end_date = datetime.combine(today, datetime.max.time())
-            
-            # Retrieve equity data
-            retrieved_equity = supabase_client.get_equity_data(
+            # Retrieve equity data (get_equity_data returns DataFrame, not list)
+            retrieved_equity_df = supabase_client.get_equity_data(
                 ticker=ticker,
-                start_date=start_date,
-                end_date=end_date
+                limit=1000
             )
             
-            print(f"\n📥 Retrieved equity data: {len(retrieved_equity)} rows")
+            print(f"\n📥 Retrieved equity data: {len(retrieved_equity_df)} rows")
             
-            if retrieved_equity:
-                print(f"   First timestamp: {retrieved_equity[0]['timestamp']}")
-                print(f"   Last timestamp: {retrieved_equity[-1]['timestamp']}")
-                print(f"   Sample price: ${retrieved_equity[-1]['price']:.2f}")
+            if not retrieved_equity_df.empty:
+                print(f"   First timestamp: {retrieved_equity_df['timestamp'].iloc[0]}")
+                print(f"   Last timestamp: {retrieved_equity_df['timestamp'].iloc[-1]}")
+                print(f"   Sample price: ${retrieved_equity_df['price'].iloc[-1]:.2f}")
             
-            # Retrieve indicators
-            retrieved_indicators = supabase_client.get_indicators(
+            # Retrieve indicators (get_indicators returns DataFrame, not list)
+            retrieved_indicators_df = supabase_client.get_indicators(
                 ticker=ticker,
-                start_date=start_date,
-                end_date=end_date
+                limit=1000
             )
             
-            print(f"\n📥 Retrieved indicators: {len(retrieved_indicators)} rows")
+            print(f"\n📥 Retrieved indicators: {len(retrieved_indicators_df)} rows")
             
-            if retrieved_indicators:
-                last_indicator = retrieved_indicators[-1]
-                print(f"   Last timestamp: {last_indicator['timestamp']}")
-                print(f"   Last SMA9: ${last_indicator['sma9']:.2f}")
-                print(f"   Last VWAP: ${last_indicator['vwap']:.2f}")
+            if not retrieved_indicators_df.empty:
+                print(f"   Last timestamp: {retrieved_indicators_df['timestamp'].iloc[-1]}")
+                print(f"   Last SMA9: ${retrieved_indicators_df['sma9'].iloc[-1]:.2f}")
+                print(f"   Last VWAP: ${retrieved_indicators_df['vwap'].iloc[-1]:.2f}")
             
-            assert len(retrieved_equity) > 0, "No equity data retrieved from Supabase"
-            assert len(retrieved_indicators) > 0, "No indicators retrieved from Supabase"
+            assert len(retrieved_equity_df) > 0, "No equity data retrieved from Supabase"
+            assert len(retrieved_indicators_df) > 0, "No indicators retrieved from Supabase"
             
             print("\n✅ Data successfully uploaded and retrieved from Supabase")
             
@@ -317,22 +310,22 @@ class TestRealTimeStreaming:
             # Step 4: Verify frontend can retrieve data
             print("\n🔍 Step 4: Verifying frontend data retrieval...")
             
-            today = datetime.now().date()
-            start_date = datetime.combine(today, datetime.min.time())
-            end_date = datetime.combine(today, datetime.max.time())
+            equity_data_df = supabase_client.get_equity_data(ticker, limit=1000)
+            indicator_data_df = supabase_client.get_indicators(ticker, limit=1000)
             
-            equity_data = supabase_client.get_equity_data(ticker, start_date, end_date)
-            indicator_data = supabase_client.get_indicators(ticker, start_date, end_date)
-            
-            print(f"   Frontend can retrieve {len(equity_data)} equity rows")
-            print(f"   Frontend can retrieve {len(indicator_data)} indicator rows")
+            print(f"   Frontend can retrieve {len(equity_data_df)} equity rows")
+            print(f"   Frontend can retrieve {len(indicator_data_df)} indicator rows")
             
             # Step 5: Check for recent data (within last hour)
             print("\n⏰ Step 5: Checking for recent data...")
             
-            if equity_data:
-                last_timestamp = equity_data[-1]['timestamp']
-                last_time = datetime.fromisoformat(last_timestamp.replace('Z', '+00:00'))
+            if not equity_data_df.empty:
+                last_timestamp = equity_data_df['timestamp'].iloc[-1]
+                # Handle both string and Timestamp objects
+                if isinstance(last_timestamp, str):
+                    last_time = datetime.fromisoformat(last_timestamp.replace('Z', '+00:00'))
+                else:
+                    last_time = last_timestamp
                 time_diff = datetime.now(last_time.tzinfo) - last_time
                 
                 print(f"   Last data point: {last_timestamp}")

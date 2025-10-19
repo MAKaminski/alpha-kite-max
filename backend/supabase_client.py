@@ -228,6 +228,19 @@ class SupabaseClient:
         """Create a new position."""
         try:
             position_data = position.model_dump(exclude={'id', 'created_at', 'updated_at'})
+            
+            # Convert date objects to ISO format strings
+            if 'expiration_date' in position_data and hasattr(position_data['expiration_date'], 'isoformat'):
+                position_data['expiration_date'] = position_data['expiration_date'].isoformat()
+            if 'closed_at' in position_data and position_data['closed_at'] and hasattr(position_data['closed_at'], 'isoformat'):
+                position_data['closed_at'] = position_data['closed_at'].isoformat()
+            
+            # Convert Decimal to float for JSON serialization
+            from decimal import Decimal
+            for key, value in position_data.items():
+                if isinstance(value, Decimal):
+                    position_data[key] = float(value)
+            
             response = self.client.table("positions")\
                 .insert(position_data)\
                 .execute()
@@ -264,6 +277,21 @@ class SupabaseClient:
         """Create a new trade record."""
         try:
             trade_data = trade.model_dump(exclude={'id', 'created_at'})
+            
+            # Convert datetime/date objects to ISO format strings
+            if 'expiration_date' in trade_data and hasattr(trade_data['expiration_date'], 'isoformat'):
+                trade_data['expiration_date'] = trade_data['expiration_date'].isoformat()
+            if 'trade_timestamp' in trade_data and hasattr(trade_data['trade_timestamp'], 'isoformat'):
+                trade_data['trade_timestamp'] = trade_data['trade_timestamp'].isoformat()
+            if 'signal_timestamp' in trade_data and hasattr(trade_data['signal_timestamp'], 'isoformat'):
+                trade_data['signal_timestamp'] = trade_data['signal_timestamp'].isoformat()
+            
+            # Convert Decimal to float for JSON serialization
+            from decimal import Decimal
+            for key, value in trade_data.items():
+                if isinstance(value, Decimal):
+                    trade_data[key] = float(value)
+            
             response = self.client.table("trades")\
                 .insert(trade_data)\
                 .execute()
@@ -281,6 +309,17 @@ class SupabaseClient:
         """Create a new trading signal record."""
         try:
             signal_data = signal.model_dump(exclude={'id', 'created_at'})
+            
+            # Convert datetime objects to ISO format strings
+            if 'signal_timestamp' in signal_data and hasattr(signal_data['signal_timestamp'], 'isoformat'):
+                signal_data['signal_timestamp'] = signal_data['signal_timestamp'].isoformat()
+            
+            # Convert Decimal to float
+            from decimal import Decimal
+            for key, value in signal_data.items():
+                if isinstance(value, Decimal):
+                    signal_data[key] = float(value)
+            
             response = self.client.table("trading_signals")\
                 .insert(signal_data)\
                 .execute()

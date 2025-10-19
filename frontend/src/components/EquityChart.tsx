@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceArea, Scatter, ComposedChart } from 'recharts';
+import { Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceArea, Scatter, ComposedChart, Bar, BarChart } from 'recharts';
 import { ChartDataPoint } from '../../../shared/types';
 import { Cross } from '@/lib/crossDetection';
 import { formatToEST } from '@/lib/timezone';
@@ -38,11 +38,11 @@ export default function EquityChart({
     const minutes = estDate.getMinutes();
     const hours = estDate.getHours();
     
-    // Only show labels at 30-minute intervals starting from market open (9:30 AM)
-    const marketOpenHour = 9;
+    // Only show labels at 30-minute intervals starting from market open (10:00 AM)
+    const marketOpenHour = 10;
     
     // Check if this is a 30-minute interval
-    const isMarketHour = hours >= marketOpenHour && hours < 16; // 9:30 AM - 4:00 PM
+    const isMarketHour = hours >= marketOpenHour && hours < 15; // 10:00 AM - 3:00 PM
     const isHalfHour = minutes === 0 || minutes === 30;
     
     if (isMarketHour && isHalfHour) {
@@ -111,8 +111,18 @@ export default function EquityChart({
     }
   }, [data]);
 
+  // Format volume for display
+  const formatVolume = (value: number) => {
+    if (value >= 1000000) {
+      return `${(value / 1000000).toFixed(1)}M`;
+    } else if (value >= 1000) {
+      return `${(value / 1000).toFixed(1)}K`;
+    }
+    return value.toString();
+  };
+
   return (
-    <div>
+    <div className="space-y-2">
       <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
               Chart | SMA9, Session VWAP ({period === 'minute' ? 'Minute' : 'Hour'} Data)
@@ -130,7 +140,8 @@ export default function EquityChart({
         </div>
       </div>
       
-      <ResponsiveContainer width="100%" height={500}>
+      {/* Main Price Chart */}
+      <ResponsiveContainer width="100%" height={400}>
         <ComposedChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.2} />
           
@@ -256,6 +267,57 @@ export default function EquityChart({
               )}
             </ComposedChart>
       </ResponsiveContainer>
+
+      {/* Volume Bar Chart */}
+      <div className="mt-2">
+        <ResponsiveContainer width="100%" height={120}>
+          <BarChart data={chartData} margin={{ top: 0, right: 30, left: 20, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.2} />
+            
+            {/* Shade non-market hours to match main chart */}
+            {showNonMarketHours && marketHoursHighlighting && marketSegments.filter(seg => !seg.isMarketHours).map((segment, idx) => (
+              <ReferenceArea
+                key={`volume-non-market-${idx}`}
+                x1={segment.start}
+                x2={segment.end}
+                fill="#374151"
+                fillOpacity={0.15}
+                ifOverflow="extendDomain"
+              />
+            ))}
+            
+            <XAxis
+              dataKey="timestamp"
+              tickFormatter={formatTime}
+              stroke="#6B7280"
+              style={{ fontSize: '12px' }}
+            />
+            <YAxis
+              tickFormatter={formatVolume}
+              stroke="#6B7280"
+              style={{ fontSize: '12px' }}
+              domain={[0, 'auto']}
+              label={{ value: 'Volume', angle: -90, position: 'insideLeft', style: { fill: '#6B7280', fontSize: '12px' } }}
+            />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: '#1F2937',
+                border: '1px solid #374151',
+                borderRadius: '8px',
+                color: '#F9FAFB',
+              }}
+              labelFormatter={(label) => `${formatToEST(label, 'h:mm:ss a')} EST`}
+              formatter={(value: number) => [formatVolume(value), 'Volume']}
+            />
+            <Bar
+              dataKey="volume"
+              fill="#3B82F6"
+              opacity={0.6}
+              radius={[4, 4, 0, 0]}
+            />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }

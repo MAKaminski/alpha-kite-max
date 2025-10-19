@@ -32,13 +32,13 @@ export function isEndOfSession(timestamp: string | Date): boolean {
     return true; // Consider holiday as end of session
   }
   
-  // Check if within last 30 minutes of trading (3:30 PM - 4:00 PM EST)
+  // Check if within last 30 minutes of trading (2:30 PM - 3:00 PM EST)
   const hours = estDate.getHours();
   const minutes = estDate.getMinutes();
   const totalMinutes = hours * 60 + minutes;
   
-  const stopTrading = 15 * 60 + 30; // 3:30 PM (30 mins before close)
-  const marketClose = 16 * 60;      // 4:00 PM
+  const stopTrading = 14 * 60 + 30; // 2:30 PM (30 mins before close)
+  const marketClose = 15 * 60;      // 3:00 PM
   
   return totalMinutes >= stopTrading && totalMinutes < marketClose;
 }
@@ -67,9 +67,9 @@ export function getMarketSessionType(timestamp: string | Date): MarketSessionTyp
   const minutes = estDate.getMinutes();
   const totalMinutes = hours * 60 + minutes;
   
-  const marketOpen = 9 * 60 + 30;  // 9:30 AM
-  const stopTrading = 15 * 60 + 30; // 3:30 PM
-  const marketClose = 16 * 60;     // 4:00 PM
+  const marketOpen = 10 * 60;       // 10:00 AM
+  const stopTrading = 14 * 60 + 30; // 2:30 PM
+  const marketClose = 15 * 60;      // 3:00 PM
   
   if (totalMinutes < marketOpen) {
     return 'pre-market';
