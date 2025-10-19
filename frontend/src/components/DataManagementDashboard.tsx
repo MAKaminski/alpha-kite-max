@@ -24,13 +24,14 @@ export default function DataManagementDashboard() {
   const [downloadStatus, setDownloadStatus] = useState<string>('');
 
   // Streaming Controls State
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [streamingStatus, setStreamingStatus] = useState<string>('Stopped');
+  const [isStreaming, setIsStreaming] = useState(true); // Default to ON
+  const [streamingStatus, setStreamingStatus] = useState<string>('🟢 Live (DEMO)');
   const [dataFeed, setDataFeed] = useState<DataFeedItem[]>([]);
   const dataFeedRef = useRef<HTMLDivElement>(null);
   const streamIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [isDemoMode, setIsDemoMode] = useState(true); // Track if using mock data
 
-  // Set default date to today
+  // Set default date to today and start streaming
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
     setSingleDate(today);
@@ -39,6 +40,10 @@ export default function DataManagementDashboard() {
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
     setStartDate(weekAgo.toISOString().split('T')[0]);
+    
+    // Auto-start streaming in DEMO MODE
+    startDataFeed();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Auto-scroll data feed to bottom when new data arrives
@@ -114,14 +119,16 @@ export default function DataManagementDashboard() {
         });
 
         if (response.ok) {
-          setStreamingStatus('🟢 Live');
+          // Currently using DEMO MODE - replace with real streaming when available
+          setStreamingStatus('🟢 Live (DEMO)');
+          setIsDemoMode(true);
           startDataFeed();
         } else {
-          setStreamingStatus('❌ Failed to start');
+          setStreamingStatus('❌ Failed');
           setIsStreaming(false);
         }
       } catch {
-        setStreamingStatus('❌ Connection error');
+        setStreamingStatus('❌ Error');
         setIsStreaming(false);
       }
     } else {
@@ -136,30 +143,36 @@ export default function DataManagementDashboard() {
         });
 
         setStreamingStatus('⚫ Stopped');
+        setIsDemoMode(false);
         stopDataFeed();
       } catch {
-        setStreamingStatus('⚫ Stopped (with errors)');
+        setStreamingStatus('⚫ Stopped');
+        setIsDemoMode(false);
         stopDataFeed();
       }
     }
   };
 
-  // Start mock data feed (replace with actual WebSocket/SSE in production)
+  // Start data feed (currently using DEMO/MOCK data)
   const startDataFeed = () => {
     // Clear existing interval
     if (streamIntervalRef.current) {
       clearInterval(streamIntervalRef.current);
     }
 
-    // Simulate live data updates every second
+    // TODO: Replace with actual WebSocket/SSE connection to real data
+    // For now, using DEMO MODE with simulated data
+    setIsDemoMode(true);
+    
+    // Simulate live data updates every second (DEMO MODE)
     streamIntervalRef.current = setInterval(() => {
       const newDataPoint: DataFeedItem = {
         timestamp: new Date().toISOString(),
         ticker: ticker,
-        price: 600 + Math.random() * 10,
-        volume: Math.floor(Math.random() * 100000),
-        sma9: 600 + Math.random() * 10,
-        vwap: 600 + Math.random() * 10
+        price: 600 + Math.random() * 10,  // MOCK: Random price around 600
+        volume: Math.floor(Math.random() * 100000),  // MOCK: Random volume
+        sma9: 600 + Math.random() * 10,  // MOCK: Random SMA9
+        vwap: 600 + Math.random() * 10   // MOCK: Random VWAP
       };
 
       setDataFeed(prev => {
@@ -308,29 +321,39 @@ export default function DataManagementDashboard() {
           </h3>
 
           {/* Streaming Toggle */}
-          <div className="mb-1 flex items-center justify-between">
-            <label className="text-[10px] font-medium text-gray-700 dark:text-gray-300">
-              {streamingStatus}
-            </label>
-            <label className="flex items-center cursor-pointer">
-              <div className="relative">
-                <input
-                  type="checkbox"
-                  checked={isStreaming}
-                  onChange={(e) => handleStreamingToggle(e.target.checked)}
-                  className="sr-only"
-                />
-                <div className={`block w-8 h-5 rounded-full transition ${
-                  isStreaming ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
-                }`}></div>
-                <div className={`dot absolute left-1 top-1 bg-white w-3 h-3 rounded-full transition ${
-                  isStreaming ? 'transform translate-x-3' : ''
-                }`}></div>
+          <div className="mb-1">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-medium text-gray-700 dark:text-gray-300">
+                {streamingStatus}
+              </label>
+              <label className="flex items-center cursor-pointer">
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    checked={isStreaming}
+                    onChange={(e) => handleStreamingToggle(e.target.checked)}
+                    className="sr-only"
+                  />
+                  <div className={`block w-8 h-5 rounded-full transition ${
+                    isStreaming ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
+                  }`}></div>
+                  <div className={`dot absolute left-1 top-1 bg-white w-3 h-3 rounded-full transition ${
+                    isStreaming ? 'transform translate-x-3' : ''
+                  }`}></div>
+                </div>
+                <span className="ml-1 text-[10px] font-medium text-gray-700 dark:text-gray-300">
+                  {isStreaming ? 'ON' : 'OFF'}
+                </span>
+              </label>
+            </div>
+            {/* DEMO MODE Warning */}
+            {isDemoMode && isStreaming && (
+              <div className="mt-1 px-1 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-700 rounded">
+                <p className="text-[8px] text-yellow-800 dark:text-yellow-300 font-semibold">
+                  ⚠️ DEMO MODE: Simulated data (not real market data)
+                </p>
               </div>
-              <span className="ml-1 text-[10px] font-medium text-gray-700 dark:text-gray-300">
-                {isStreaming ? 'ON' : 'OFF'}
-              </span>
-            </label>
+            )}
           </div>
 
           {/* Live Data Feed */}
