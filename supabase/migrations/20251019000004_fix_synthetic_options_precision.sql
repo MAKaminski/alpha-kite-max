@@ -1,7 +1,10 @@
--- Create synthetic options prices table for Black-Scholes generated data
--- This table mirrors the structure of the real options data but with additional fields
--- to distinguish synthetic data from real market data
+-- Fix numeric field precision for synthetic options table
+-- Drop and recreate the table with proper precision
 
+-- Drop existing table and recreate with correct precision
+DROP TABLE IF EXISTS synthetic_option_prices CASCADE;
+
+-- Create synthetic options prices table with proper precision
 CREATE TABLE IF NOT EXISTS synthetic_option_prices (
     id BIGSERIAL PRIMARY KEY,
     timestamp TIMESTAMPTZ NOT NULL,
@@ -29,7 +32,7 @@ CREATE TABLE IF NOT EXISTS synthetic_option_prices (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Create indexes for efficient querying
+-- Recreate indexes for efficient querying
 CREATE INDEX IF NOT EXISTS idx_synthetic_options_timestamp ON synthetic_option_prices(timestamp);
 CREATE INDEX IF NOT EXISTS idx_synthetic_options_ticker ON synthetic_option_prices(ticker);
 CREATE INDEX IF NOT EXISTS idx_synthetic_options_expiration ON synthetic_option_prices(expiration_date);
@@ -64,10 +67,6 @@ CREATE POLICY "Allow authenticated users to update synthetic options data" ON sy
 CREATE POLICY "Allow authenticated users to delete synthetic options data" ON synthetic_option_prices
     FOR DELETE TO authenticated
     USING (true);
-
--- Note: Combined view will be created separately after confirming column names
-
--- Note: Function will be created separately after confirming column names
 
 -- Grant permissions
 GRANT SELECT ON synthetic_option_prices TO authenticated;

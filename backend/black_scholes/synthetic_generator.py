@@ -210,11 +210,37 @@ class SyntheticOptionsGenerator:
             True if successful, False otherwise
         """
         try:
-            # Convert DataFrame to list of dictionaries
+            # Convert DataFrame to list of dictionaries with proper timestamp formatting
             data = df.to_dict('records')
             
-            # Save to Supabase
-            result = self.supabase_client.supabase.table(table_name).insert(data).execute()
+            # Convert pandas Timestamps and dates to ISO format strings
+            for record in data:
+                if 'timestamp' in record and pd.notna(record['timestamp']):
+                    if isinstance(record['timestamp'], pd.Timestamp):
+                        record['timestamp'] = record['timestamp'].isoformat()
+                if 'expiration_date' in record and pd.notna(record['expiration_date']):
+                    if isinstance(record['expiration_date'], pd.Timestamp):
+                        record['expiration_date'] = record['expiration_date'].date().isoformat()
+                    elif hasattr(record['expiration_date'], 'isoformat'):  # datetime.date
+                        record['expiration_date'] = record['expiration_date'].isoformat()
+                if 'created_at' in record and pd.notna(record['created_at']):
+                    if isinstance(record['created_at'], pd.Timestamp):
+                        record['created_at'] = record['created_at'].isoformat()
+                if 'updated_at' in record and pd.notna(record['updated_at']):
+                    if isinstance(record['updated_at'], pd.Timestamp):
+                        record['updated_at'] = record['updated_at'].isoformat()
+            
+            # Save to Supabase in batches to avoid timeout
+            batch_size = 1000
+            total_inserted = 0
+            
+            for i in range(0, len(data), batch_size):
+                batch = data[i:i + batch_size]
+                result = self.supabase_client.client.table(table_name).insert(batch).execute()
+                total_inserted += len(batch)
+                logger.info("synthetic_options_batch_saved", 
+                           batch_size=len(batch), 
+                           total_inserted=total_inserted)
             
             logger.info("synthetic_options_data_saved",
                        table=table_name,
