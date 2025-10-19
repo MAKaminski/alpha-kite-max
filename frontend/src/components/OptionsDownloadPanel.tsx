@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
 import { formatToEST } from '@/lib/timezone';
+import { useEffect, useState } from 'react';
 
 interface StrikeOption {
   strike: number;

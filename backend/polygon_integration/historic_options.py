@@ -293,8 +293,8 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description="Download historical options data from Polygon.io")
     parser.add_argument("--ticker", default="QQQ", help="Ticker symbol")
-    parser.add_argument("--strike", type=float, required=True, help="Strike price")
-    parser.add_argument("--date", required=True, help="Date (YYYY-MM-DD)")
+    parser.add_argument("--strike", type=float, help="Strike price")
+    parser.add_argument("--date", help="Date (YYYY-MM-DD)")
     parser.add_argument("--test", action="store_true", help="Test connection only")
     
     args = parser.parse_args()
@@ -303,9 +303,19 @@ if __name__ == "__main__":
         client = PolygonHistoricOptions()
         
         if args.test:
+            print("="*60)
+            print("POLYGON.IO API CONNECTION TEST")
+            print("="*60)
             print("✅ Polygon API connection successful!")
             print(f"API Key: {client.api_key[:10]}...")
+            print(f"Base URL: {client.base_url}")
+            print(f"Free Tier: 5 calls/min, 2 years historical data")
+            print("="*60)
         else:
+            if not args.strike or not args.date:
+                print("❌ Error: --strike and --date required (or use --test)")
+                exit(1)
+                
             print(f"Downloading {args.ticker} options for strike ${args.strike} on {args.date}...")
             df = client.download_0dte_options_historic(
                 ticker=args.ticker,
@@ -326,5 +336,7 @@ if __name__ == "__main__":
     
     except Exception as e:
         print(f"❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
         exit(1)
 

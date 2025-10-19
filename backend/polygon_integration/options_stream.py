@@ -1,8 +1,17 @@
 """
 Polygon.io Real-Time Options Streaming
 
+⚠️ REQUIRES PAID TIER - Not available on free tier
+
 Streams real-time options data via Polygon.io WebSocket.
-Free tier limits: 5 WebSocket connections max.
+Requires:
+- Polygon.io paid subscription (Starter tier or higher)
+- websocket-client package: pip install websocket-client
+
+Free tier limitations:
+- ❌ No WebSocket streaming
+- ❌ No real-time options quotes
+- ✅ Historical data via REST API only
 """
 
 import os
