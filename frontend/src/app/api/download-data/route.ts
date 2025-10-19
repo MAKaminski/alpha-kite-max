@@ -71,17 +71,17 @@ export async function POST(request: NextRequest) {
         // Date range data
         const start = new Date(startDate);
         const end = new Date(endDate);
-        let currentDate = new Date(start);
+        const current = new Date(start);
         
-        while (currentDate <= end) {
-          const dateStr = currentDate.toISOString().split('T')[0];
+        while (current <= end) {
+          const dateStr = current.toISOString().split('T')[0];
           // Add a few sample rows for each day
           for (let i = 0; i < 3; i++) {
             const hour = 10 + Math.floor(i / 60);
             const minute = i % 60;
             csvRows.push(`${dateStr} ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00,${ticker},${(600 + Math.random() * 10).toFixed(2)},${Math.floor(15000 + Math.random() * 5000)},${(600 + Math.random() * 10).toFixed(2)},${(600 + Math.random() * 10).toFixed(2)}`);
           }
-          currentDate.setDate(currentDate.getDate() + 1);
+          current.setDate(current.getDate() + 1);
         }
       }
       
