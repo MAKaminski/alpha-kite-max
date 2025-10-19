@@ -19,10 +19,10 @@ CREATE TABLE IF NOT EXISTS public.positions (
 );
 
 -- Create index on ticker and status for efficient queries
-CREATE INDEX idx_positions_ticker_status ON public.positions(ticker, status);
+CREATE INDEX IF NOT EXISTS idx_positions_ticker_status ON public.positions(ticker, status);
 
 -- Create index on status and created_at
-CREATE INDEX idx_positions_status_created ON public.positions(status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_positions_status_created ON public.positions(status, created_at DESC);
 
 -- Add comment
 COMMENT ON TABLE public.positions IS 'Tracks option positions (open, closed, expired)';
@@ -46,8 +46,8 @@ CREATE TABLE IF NOT EXISTS public.trades (
 );
 
 -- Create indexes
-CREATE INDEX idx_trades_ticker_timestamp ON public.trades(ticker, trade_timestamp DESC);
-CREATE INDEX idx_trades_position_id ON public.trades(position_id);
+CREATE INDEX IF NOT EXISTS idx_trades_ticker_timestamp ON public.trades(ticker, trade_timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_trades_position_id ON public.trades(position_id);
 
 -- Add comment
 COMMENT ON TABLE public.trades IS 'Records all trade executions (entries and exits)';
@@ -68,8 +68,8 @@ CREATE TABLE IF NOT EXISTS public.trading_signals (
 );
 
 -- Create indexes
-CREATE INDEX idx_signals_ticker_timestamp ON public.trading_signals(ticker, signal_timestamp DESC);
-CREATE INDEX idx_signals_action_taken ON public.trading_signals(action_taken);
+CREATE INDEX IF NOT EXISTS idx_signals_ticker_timestamp ON public.trading_signals(ticker, signal_timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_signals_action_taken ON public.trading_signals(action_taken);
 
 -- Add comment
 COMMENT ON TABLE public.trading_signals IS 'Records all SMA9/VWAP cross signals';
@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS public.daily_pnl (
 );
 
 -- Create index
-CREATE INDEX idx_daily_pnl_ticker_date ON public.daily_pnl(ticker, trade_date DESC);
+CREATE INDEX IF NOT EXISTS idx_daily_pnl_ticker_date ON public.daily_pnl(ticker, trade_date DESC);
 
 -- Add comment
 COMMENT ON TABLE public.daily_pnl IS 'Daily profit and loss tracking';
