@@ -16,6 +16,37 @@ Real-time trading dashboard with automated 0DTE options trading based on SMA9/VW
 
 ---
 
+## 📚 Documentation
+
+### 📖 Core Documentation
+- **[GETTING_STARTED.md](./GETTING_STARTED.md)** - Complete setup guide (start here!)
+- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - System architecture and design
+- **[CONTRIBUTING.md](./CONTRIBUTING.md)** - How to contribute to the project
+- **[SECURITY.md](./SECURITY.md)** - Security policies and best practices
+- **[CHANGELOG.md](./CHANGELOG.md)** - Version history and changes
+
+### 📋 Guides
+- **[docs/guides/QUICKSTART_OAUTH.md](./docs/guides/QUICKSTART_OAUTH.md)** - Schwab OAuth setup
+- **[docs/guides/BLACK_SCHOLES_SYNTHETIC_OPTIONS.md](./docs/guides/BLACK_SCHOLES_SYNTHETIC_OPTIONS.md)** - Synthetic options data generation
+- **[docs/POLYGON.md](./docs/POLYGON.md)** - Polygon.io integration guide
+
+### 🔧 Technical Documentation
+- **[docs/DATA_FLOW.md](./docs/DATA_FLOW.md)** - How data flows through the system
+- **[docs/DEPLOYMENT_GUIDE.md](./docs/DEPLOYMENT_GUIDE.md)** - Deploy to production
+- **[docs/TESTING_GUIDE.md](./docs/TESTING_GUIDE.md)** - Run and write tests
+- **[docs/FEATURE_REFERENCE.md](./docs/FEATURE_REFERENCE.md)** - Complete feature list
+
+### 📊 Status & Reports
+- **[docs/status/PROJECT_STATUS.md](./docs/status/PROJECT_STATUS.md)** - Current project status
+- **[docs/status/FINAL_DEPLOYMENT_STATUS.md](./docs/status/FINAL_DEPLOYMENT_STATUS.md)** - Deployment status
+
+### 📦 Backend-Specific
+- **[backend/README.md](./backend/README.md)** - Backend overview
+- **[backend/TESTING.md](./backend/TESTING.md)** - Backend testing guide
+- **[backend/polygon_integration/README.md](./backend/polygon_integration/README.md)** - Polygon API integration
+
+---
+
 ## 🎯 What Is This?
 
 Alpha Kite Max is an automated trading system that:
