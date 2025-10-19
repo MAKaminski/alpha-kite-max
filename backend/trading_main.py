@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 from schwab_integration.client import SchwabClient
-from schwab_integration.downloader import DataDownloader
+from schwab_integration.downloader import EquityDownloader
 from schwab_integration.trading_engine import TradingEngine
 from schwab_integration.config import SchwabConfig, SupabaseConfig, AppConfig
 from supabase_client import SupabaseClient
@@ -41,7 +41,7 @@ class TradingBot:
         # Initialize clients
         self.schwab_client = SchwabClient(self.schwab_config)
         self.supabase_client = SupabaseClient(self.supabase_config)
-        self.data_downloader = DataDownloader(self.schwab_client, self.supabase_client)
+        self.data_downloader = EquityDownloader(self.schwab_client, self.supabase_client)
         self.trading_engine = TradingEngine(self.schwab_client, self.supabase_client)
         
         self.ticker = self.app_config.default_ticker
@@ -109,8 +109,12 @@ class TradingBot:
             # Download latest data
             await self._update_market_data()
             
-            # Check for cross signals
-            await self._check_cross_signals(timestamp)
+            # Check if we need to close positions at end of day (2:55 PM ET)
+            await self._check_end_of_day_close(timestamp)
+            
+            # Check for cross signals (only before 2:30 PM)
+            if self._is_trading_allowed(timestamp):
+                await self._check_cross_signals(timestamp)
             
             # Check profit/loss targets
             await self._check_profit_loss_targets()
@@ -205,6 +209,44 @@ class TradingBot:
                 
         except Exception as e:
             logger.error("profit_loss_check_failed", error=str(e))
+    
+    async def _check_end_of_day_close(self, timestamp: datetime):
+        """Close all open positions at end of trading day (2:55 PM ET)."""
+        try:
+            est_time = timestamp.replace(tzinfo=None)
+            close_time = est_time.replace(hour=14, minute=55, second=0, microsecond=0)  # 2:55 PM
+            end_close_time = est_time.replace(hour=15, minute=0, second=0, microsecond=0)  # 3:00 PM
+            
+            # Only close positions between 2:55-3:00 PM
+            if close_time <= est_time < end_close_time:
+                # Get all open positions
+                open_positions = self.supabase_client.get_open_positions(self.ticker)
+                
+                if open_positions:
+                    logger.info("end_of_day_close_triggered", 
+                               positions_count=len(open_positions),
+                               time=est_time.strftime("%H:%M:%S"))
+                    
+                    # Close all positions
+                    self.trading_engine._close_positions(
+                        open_positions,
+                        close_timestamp=timestamp.isoformat()
+                    )
+                    
+                    logger.info("end_of_day_close_complete", 
+                               positions_closed=len(open_positions))
+                else:
+                    logger.debug("no_positions_to_close_at_eod")
+                    
+        except Exception as e:
+            logger.error("end_of_day_close_failed", error=str(e))
+    
+    def _is_trading_allowed(self, timestamp: datetime) -> bool:
+        """Check if we can open new positions (before 2:30 PM ET)."""
+        est_time = timestamp.replace(tzinfo=None)
+        stop_trading = est_time.replace(hour=14, minute=30, second=0, microsecond=0)  # 2:30 PM
+        
+        return est_time < stop_trading
     
     async def _update_daily_pnl(self, trade_date):
         """Update daily P&L summary."""
