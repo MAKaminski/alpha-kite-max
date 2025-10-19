@@ -25,11 +25,17 @@ class PolygonHistoricOptions:
         Initialize Polygon API client.
         
         Args:
-            api_key: Polygon.io API key. If None, reads from POLYGON_API_KEY env var.
+            api_key: Polygon.io API key. If None, reads from POLYGON_API env var.
         """
-        self.api_key = api_key or os.getenv('POLYGON_API_KEY')
+        # Try primary API key first
+        self.api_key = api_key or os.getenv('POLYGON_API')
+        
+        # Fallback to access key ID
         if not self.api_key:
-            raise ValueError("POLYGON_API_KEY not found in environment variables")
+            self.api_key = os.getenv('POLYGON_ACCESS_KEY_ID')
+        
+        if not self.api_key:
+            raise ValueError("POLYGON_API or POLYGON_ACCESS_KEY_ID not found in environment variables")
         
         self.base_url = "https://api.polygon.io"
         self.session = requests.Session()
@@ -63,7 +69,7 @@ class PolygonHistoricOptions:
         option_symbol = f"O:{ticker}{exp_str}{type_code}{strike_str}"
         
         url = f"{self.base_url}/v3/reference/options/contracts/{option_symbol}"
-        params = {"apiKey": self.api_key}
+        params = {"apikey": self.api_key}
         
         try:
             response = self.session.get(url, params=params, timeout=10)
@@ -100,7 +106,7 @@ class PolygonHistoricOptions:
         """
         url = f"{self.base_url}/v3/snapshot/options/{ticker}"
         params = {
-            "apiKey": self.api_key,
+            "apikey": self.api_key,
             "expiration_date": expiration_date,
             "limit": 250  # Max results per request
         }
@@ -181,7 +187,7 @@ class PolygonHistoricOptions:
         """
         url = f"{self.base_url}/v2/aggs/ticker/{option_symbol}/range/{multiplier}/{timespan}/{start_date}/{end_date}"
         params = {
-            "apiKey": self.api_key,
+            "apikey": self.api_key,
             "adjusted": "true",
             "sort": "asc",
             "limit": 50000  # Max results
