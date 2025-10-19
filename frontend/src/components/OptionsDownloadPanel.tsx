@@ -20,7 +20,7 @@ export default function OptionsDownloadPanel({ ticker, selectedDate }: OptionsDo
   const [dailyHigh, setDailyHigh] = useState<number | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadStatus, setDownloadStatus] = useState<string>('');
-  const [autoGenerateStrikes, setAutoGenerateStrikes] = useState(true);
+  const autoGenerateStrikes = true; // Always auto-generate strikes based on daily range
 
   // Generate strike prices based on daily range
   useEffect(() => {
