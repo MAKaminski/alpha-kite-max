@@ -30,6 +30,16 @@ htmlcov/
 .schwab_tokens.json
 backend/config/schwab_token.json
 
+# SSL/TLS Certificates and Private Keys (SECURITY CRITICAL)
+*.key
+*.pem
+*.crt
+*.cer
+*.p12
+*.pfx
+*.keystore
+*.jks
+
 # Terraform
 infrastructure/.terraform/
 infrastructure/*.tfstate
