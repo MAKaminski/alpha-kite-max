@@ -186,119 +186,97 @@ export default function DataManagementDashboard() {
   }, []);
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 space-y-3">
-      <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-        Data Management Dashboard
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-2 space-y-2">
+      <h2 className="text-sm font-bold text-gray-900 dark:text-white">
+        Data Management
       </h2>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-2">
         {/* Historical Data Download Panel */}
-        <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2 flex items-center">
-            <span className="mr-2">📥</span> Historical Data Download
+        <div className="bg-gray-50 dark:bg-gray-900 rounded p-2 border border-gray-200 dark:border-gray-700">
+          <h3 className="text-xs font-semibold text-gray-900 dark:text-white mb-1 flex items-center">
+            <span className="mr-1">📥</span> Download
           </h3>
 
           {/* Ticker Input */}
-          <div className="mb-2">
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Ticker Symbol
-            </label>
+          <div className="mb-1">
             <input
               type="text"
               value={ticker}
               onChange={(e) => setTicker(e.target.value.toUpperCase())}
-              className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+              className="w-full px-1 py-0.5 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-1 focus:ring-blue-500"
               placeholder="QQQ"
             />
           </div>
 
           {/* Download Mode Toggle */}
-          <div className="mb-2">
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Mode</label>
-            <div className="flex gap-3">
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  checked={downloadMode === 'single'}
-                  onChange={() => setDownloadMode('single')}
-                  className="mr-1"
-                />
-                <span className="text-xs text-gray-700 dark:text-gray-300">Single Day</span>
-              </label>
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  checked={downloadMode === 'range'}
-                  onChange={() => setDownloadMode('range')}
-                  className="mr-1"
-                />
-                <span className="text-xs text-gray-700 dark:text-gray-300">Range</span>
-              </label>
-            </div>
+          <div className="mb-1 flex gap-2">
+            <label className="flex items-center">
+              <input
+                type="radio"
+                checked={downloadMode === 'single'}
+                onChange={() => setDownloadMode('single')}
+                className="mr-0.5"
+              />
+              <span className="text-[10px] text-gray-700 dark:text-gray-300">Day</span>
+            </label>
+            <label className="flex items-center">
+              <input
+                type="radio"
+                checked={downloadMode === 'range'}
+                onChange={() => setDownloadMode('range')}
+                className="mr-0.5"
+              />
+              <span className="text-[10px] text-gray-700 dark:text-gray-300">Range</span>
+            </label>
           </div>
 
           {/* Download Target Toggle */}
-          <div className="mb-2">
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Save To</label>
-            <div className="flex gap-3">
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  checked={downloadTarget === 'database'}
-                  onChange={() => setDownloadTarget('database')}
-                  className="mr-1"
-                />
-                <span className="text-xs text-gray-700 dark:text-gray-300">Database</span>
-              </label>
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  checked={downloadTarget === 'csv'}
-                  onChange={() => setDownloadTarget('csv')}
-                  className="mr-1"
-                />
-                <span className="text-xs text-gray-700 dark:text-gray-300">CSV File</span>
-              </label>
-            </div>
+          <div className="mb-1 flex gap-2">
+            <label className="flex items-center">
+              <input
+                type="radio"
+                checked={downloadTarget === 'database'}
+                onChange={() => setDownloadTarget('database')}
+                className="mr-0.5"
+              />
+              <span className="text-[10px] text-gray-700 dark:text-gray-300">DB</span>
+            </label>
+            <label className="flex items-center">
+              <input
+                type="radio"
+                checked={downloadTarget === 'csv'}
+                onChange={() => setDownloadTarget('csv')}
+                className="mr-0.5"
+              />
+              <span className="text-[10px] text-gray-700 dark:text-gray-300">CSV</span>
+            </label>
           </div>
 
           {/* Date Inputs */}
           {downloadMode === 'single' ? (
-            <div className="mb-2">
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Date
-              </label>
+            <div className="mb-1">
               <input
                 type="date"
                 value={singleDate}
                 onChange={(e) => setSingleDate(e.target.value)}
-                className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                className="w-full px-1 py-0.5 text-[10px] border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-1 focus:ring-blue-500"
               />
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-2 mb-2">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Start Date
-                </label>
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  End Date
-                </label>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
+            <div className="grid grid-cols-2 gap-1 mb-1">
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-full px-1 py-0.5 text-[10px] border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-1 focus:ring-blue-500"
+              />
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="w-full px-1 py-0.5 text-[10px] border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-1 focus:ring-blue-500"
+              />
             </div>
           )}
 
@@ -306,33 +284,33 @@ export default function DataManagementDashboard() {
           <button
             onClick={handleDownload}
             disabled={isDownloading}
-            className={`w-full py-2 px-3 text-sm rounded-md font-semibold text-white transition-colors ${
+            className={`w-full py-1 px-2 text-[10px] rounded font-semibold text-white transition-colors ${
               isDownloading
                 ? 'bg-gray-400 cursor-not-allowed'
                 : 'bg-blue-600 hover:bg-blue-700'
             }`}
           >
-            {isDownloading ? 'Downloading...' : 'Download Data'}
+            {isDownloading ? 'Loading...' : 'Download'}
           </button>
 
           {/* Download Status */}
           {downloadStatus && (
-            <div className="mt-2 p-2 rounded-md bg-gray-100 dark:bg-gray-800 text-xs text-gray-900 dark:text-white">
+            <div className="mt-1 p-1 rounded bg-gray-100 dark:bg-gray-800 text-[9px] text-gray-900 dark:text-white">
               {downloadStatus}
             </div>
           )}
         </div>
 
         {/* Live Streaming Panel */}
-        <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2 flex items-center">
-            <span className="mr-2">📡</span> Real-Time Data Stream
+        <div className="bg-gray-50 dark:bg-gray-900 rounded p-2 border border-gray-200 dark:border-gray-700">
+          <h3 className="text-xs font-semibold text-gray-900 dark:text-white mb-1 flex items-center">
+            <span className="mr-1">📡</span> Stream
           </h3>
 
           {/* Streaming Toggle */}
-          <div className="mb-2 flex items-center justify-between">
-            <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
-              Status: <span className="font-bold">{streamingStatus}</span>
+          <div className="mb-1 flex items-center justify-between">
+            <label className="text-[10px] font-medium text-gray-700 dark:text-gray-300">
+              {streamingStatus}
             </label>
             <label className="flex items-center cursor-pointer">
               <div className="relative">
@@ -342,68 +320,65 @@ export default function DataManagementDashboard() {
                   onChange={(e) => handleStreamingToggle(e.target.checked)}
                   className="sr-only"
                 />
-                <div className={`block w-10 h-6 rounded-full transition ${
+                <div className={`block w-8 h-5 rounded-full transition ${
                   isStreaming ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
                 }`}></div>
-                <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition ${
-                  isStreaming ? 'transform translate-x-4' : ''
+                <div className={`dot absolute left-1 top-1 bg-white w-3 h-3 rounded-full transition ${
+                  isStreaming ? 'transform translate-x-3' : ''
                 }`}></div>
               </div>
-              <span className="ml-2 text-xs font-medium text-gray-700 dark:text-gray-300">
+              <span className="ml-1 text-[10px] font-medium text-gray-700 dark:text-gray-300">
                 {isStreaming ? 'ON' : 'OFF'}
               </span>
             </label>
           </div>
 
           {/* Live Data Feed */}
-          <div className="mt-2">
-            <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-              Live Data Feed
-            </h4>
-            <div
-              ref={dataFeedRef}
-              className="bg-black dark:bg-gray-950 rounded-md p-2 h-48 overflow-y-auto font-mono text-xs text-green-400"
-              style={{
-                scrollBehavior: 'smooth'
-              }}
-            >
-              {dataFeed.length === 0 ? (
-                <div className="text-gray-500 text-center pt-4 text-xs">
-                  {isStreaming ? 'Waiting for data...' : 'Enable streaming'}
-                </div>
-              ) : (
-                dataFeed.map((item, idx) => (
-                  <div key={idx} className="mb-1 border-b border-gray-800 pb-1">
-                    <div className="text-gray-400 text-xs">{formatToEST(item.timestamp, 'h:mm:ss a')}</div>
-                    <div className="flex justify-between text-xs">
-                      <span>{item.ticker}</span>
-                      <span className="text-blue-400">${item.price.toFixed(2)}</span>
-                      <span className="text-yellow-400">{(item.volume / 1000).toFixed(0)}K</span>
-                    </div>
-                    {item.sma9 && item.vwap && (
-                      <div className="text-gray-500 text-[10px] flex justify-between">
-                        <span>SMA9: ${item.sma9.toFixed(2)}</span>
-                        <span>VWAP: ${item.vwap.toFixed(2)}</span>
-                      </div>
-                    )}
+          <div
+            ref={dataFeedRef}
+            className="bg-black dark:bg-gray-950 rounded p-1 h-32 overflow-y-auto font-mono text-[9px] text-green-400"
+            style={{
+              scrollBehavior: 'smooth'
+            }}
+          >
+            {dataFeed.length === 0 ? (
+              <div className="text-gray-500 text-center pt-2 text-[9px]">
+                {isStreaming ? 'Waiting...' : 'Toggle ON'}
+              </div>
+            ) : (
+              dataFeed.map((item, idx) => (
+                <div key={idx} className="mb-0.5 border-b border-gray-800 pb-0.5">
+                  <div className="text-gray-400 text-[9px]">{formatToEST(item.timestamp, 'h:mm:ss a')}</div>
+                  <div className="flex justify-between text-[9px]">
+                    <span>{item.ticker}</span>
+                    <span className="text-blue-400">${item.price.toFixed(2)}</span>
+                    <span className="text-yellow-400">{(item.volume / 1000).toFixed(0)}K</span>
                   </div>
-                ))
-              )}
-            </div>
+                  {item.sma9 && item.vwap && (
+                    <div className="text-gray-500 text-[8px] flex justify-between">
+                      <span>SMA: ${item.sma9.toFixed(2)}</span>
+                      <span>VWAP: ${item.vwap.toFixed(2)}</span>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
           </div>
         </div>
-      </div>
 
-      {/* Info Panel */}
-      <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-2 border border-blue-200 dark:border-blue-800">
-        <h4 className="text-xs font-semibold text-blue-900 dark:text-blue-300 mb-1">
-          💡 Quick Tips
-        </h4>
-        <ul className="text-xs text-blue-800 dark:text-blue-400 space-y-0.5 list-disc list-inside">
-          <li><strong>Single Day</strong>: Download specific trading days</li>
-          <li><strong>Date Range</strong>: Backfill historical data (up to 10 days)</li>
-          <li><strong>Stream</strong>: Live market data (10 AM - 3 PM ET)</li>
-        </ul>
+        {/* Info Panel */}
+        <div className="bg-blue-50 dark:bg-blue-900/20 rounded p-2 border border-blue-200 dark:border-blue-800">
+          <h4 className="text-xs font-semibold text-blue-900 dark:text-blue-300 mb-1">
+            💡 Tips
+          </h4>
+          <ul className="text-[9px] text-blue-800 dark:text-blue-400 space-y-0.5 list-disc list-inside">
+            <li><strong>Day</strong>: Specific date</li>
+            <li><strong>Range</strong>: Multiple days (max 10)</li>
+            <li><strong>DB</strong>: Saves to database</li>
+            <li><strong>CSV</strong>: Downloads file</li>
+            <li><strong>Stream</strong>: 10 AM - 3 PM ET</li>
+          </ul>
+        </div>
       </div>
     </div>
   );

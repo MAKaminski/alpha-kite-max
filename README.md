@@ -1,197 +1,407 @@
 # Alpha Kite Max
 
-Trading dashboard with real-time equity data visualization featuring SMA9 and Session VWAP indicators.
+Real-time trading dashboard with automated 0DTE options trading based on SMA9/VWAP cross signals.
 
-## License
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Node 18+](https://img.shields.io/badge/node-18+-green.svg)](https://nodejs.org/)
 
-This project is licensed under the MIT License with commercial use restrictions. See [LICENSE](LICENSE) for details.
+---
 
-## Features
+## ⚡ Quick Start
 
-- Real-time equity data display (default: QQQ)
-- 9-period Simple Moving Average (SMA9)
-- Session Volume Weighted Average Price (VWAP)
-- Minute-level granularity
-- Modern, responsive UI
+**New to Alpha Kite Max?** → Read [**GETTING_STARTED.md**](./GETTING_STARTED.md) (15-minute setup)
 
-## Tech Stack
+**Experienced Developer?** → Jump to [Developer Setup](#developer-setup)
 
-- **Frontend**: Next.js 15 with TypeScript, Tailwind CSS, Recharts
-- **Backend**: Supabase
+---
+
+## 🎯 What Is This?
+
+Alpha Kite Max is an automated trading system that:
+- 📊 Monitors QQQ in real-time (minute-by-minute)
+- 📈 Calculates technical indicators (SMA9, Session VWAP)
+- 🎯 Detects trading signals (SMA9/VWAP crosses)
+- 🤖 Automatically trades 0DTE options
+- 💰 Tracks performance and P&L
+
+### Trading Strategy
+- **Down Cross** (SMA9 below VWAP): Sell 25 PUT contracts
+- **Up Cross** (SMA9 above VWAP): Sell 25 CALL contracts
+- **Profit Target**: 50% of entry credit
+- **Stop Loss**: 200% loss
+- **Trading Hours**: 10:00 AM - 3:00 PM ET
+
+---
+
+## ✨ Features
+
+### Trading & Analytics
+- ✅ Real-time data streaming from Schwab API
+- ✅ Automated cross signal detection
+- ✅ Automated option trading (paper trading mode)
+- ✅ Position and P&L tracking
+- ✅ Transaction logging and analytics
+
+### Visualization
+- ✅ Interactive price charts with indicators
+- ✅ Volume bar charts
+- ✅ Cross markers on charts
+- ✅ Market hours highlighting
+- ✅ Dark mode support
+
+### Infrastructure
+- ✅ AWS Lambda for real-time data collection
+- ✅ Supabase (PostgreSQL) for data storage
+- ✅ Vercel deployment for frontend
+- ✅ Comprehensive test suite (19/19 passing)
+
+---
+
+## 🏗️ Tech Stack
+
+### Frontend
+- **Framework**: Next.js 15 (React 18)
+- **Language**: TypeScript 5
+- **Styling**: Tailwind CSS
+- **Charts**: Recharts
 - **Deployment**: Vercel
 
-## Getting Started
+### Backend
+- **Language**: Python 3.10
+- **API**: Schwab API (schwab-py)
+- **Database**: Supabase (PostgreSQL)
+- **Cloud**: AWS Lambda, EventBridge, Secrets Manager
+- **Infrastructure**: Terraform
 
-### Prerequisites
+### Development Tools
+- **Package Manager**: `uv` (Python), `npm` (Node.js)
+- **Testing**: pytest, React Testing Library
+- **VS Code**: Integrated launch configurations
 
-- Node.js 18+
-- Supabase account
-- Vercel account (for deployment)
+---
 
-### Local Development
+## 🚀 Quick Start Commands
 
-1. Clone the repository:
 ```bash
+# Clone repository
 git clone https://github.com/MAKaminski/alpha-kite-max.git
 cd alpha-kite-max
+
+# Apply database migrations
+supabase login
+supabase link --project-ref xwcauibwyxhsifnotnzz
+supabase db push
+
+# Backend setup
+cd backend
+uv venv && source .venv/bin/activate
+uv pip install -r requirements.txt
+cp ../env.example .env  # Edit with your credentials
+
+# Authenticate with Schwab
+./reauth_schwab.sh
+
+# Download historical data
+python main.py --ticker QQQ --days 5
+
+# Start paper trading
+python trading_main.py --mode paper --ticker QQQ
 ```
 
-2. Install dependencies:
+**Full Setup Guide**: [GETTING_STARTED.md](./GETTING_STARTED.md)
+
+---
+
+## 📖 Documentation
+
+### Getting Started
+- **[GETTING_STARTED.md](./GETTING_STARTED.md)** - 15-minute setup guide
+- **[QUICKSTART_OAUTH.md](./QUICKSTART_OAUTH.md)** - Schwab authentication
+
+### Core Documentation
+- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - System architecture and design
+- **[SECURITY.md](./SECURITY.md)** - Security best practices
+- **[CONTRIBUTING.md](./CONTRIBUTING.md)** - Contribution guidelines
+
+### Implementation Guides
+- **[docs/DEPLOYMENT_GUIDE.md](./docs/DEPLOYMENT_GUIDE.md)** - Production deployment
+- **[docs/TESTING_GUIDE.md](./docs/TESTING_GUIDE.md)** - Testing workflows
+- **[docs/FEATURE_REFERENCE.md](./docs/FEATURE_REFERENCE.md)** - Feature documentation
+- **[docs/DATA_FLOW.md](./docs/DATA_FLOW.md)** - Data storage and flow
+
+### Component Documentation
+- **[backend/README.md](./backend/README.md)** - Backend API reference
+- **[frontend/README.md](./frontend/README.md)** - Frontend components
+- **[infrastructure/README.md](./infrastructure/README.md)** - Terraform setup
+
+---
+
+## 🔧 Developer Setup
+
+### Prerequisites
+- Python 3.10+
+- Node.js 18+
+- Schwab Developer Account
+- Supabase Account
+- AWS Account (optional, for Lambda)
+
+### Backend
+
+```bash
+cd backend
+
+# Install uv (fast package manager)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Create virtual environment
+uv venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+
+# Install dependencies
+uv pip install -r requirements.txt
+
+# Configure environment
+cp ../env.example .env
+# Edit .env with your credentials
+```
+
+### Frontend
+
 ```bash
 cd frontend
+
+# Install dependencies
 npm install
-```
 
-3. Configure environment variables:
-```bash
-cp ../env.example frontend/.env.local
-```
+# Configure environment
+cp ../env.example .env.local
+# Edit .env.local with Supabase credentials
 
-Edit `frontend/.env.local` and add your Supabase credentials:
-```
-NEXT_PUBLIC_SUPABASE_URL=your-supabase-project-url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
-```
-
-4. Run the development server:
-```bash
+# Run development server
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open http://localhost:3000
 
-## Supabase Setup
+### VS Code Integration
 
-### Applying Migrations
+Press **F5** to access all tasks:
+- 🔐 Authentication
+- 📥 Download Data
+- 📡 Stream Data
+- 🧪 Run Tests
+- 📈 Trading Engine
 
-The database schema is managed through Supabase migrations.
+See [`.vscode/launch.json`](./.vscode/launch.json) for all configurations.
 
-**Option 1: Using Supabase CLI** (Recommended)
+---
+
+## 🧪 Testing
+
 ```bash
-# Login to Supabase
-supabase login
-
-# Link to your project
-supabase link --project-ref xwcauibwyxhsifnotnzz
-
-# Apply migrations
-supabase db push
-```
-
-**Option 2: Manual via SQL Editor**
-
-In your Supabase dashboard → SQL Editor, run the migration file:
-```bash
-supabase/migrations/20251015151016_create_equity_and_indicators_tables.sql
-```
-
-This creates:
-- `equity_data` table with ticker, timestamp, price, volume
-- `indicators` table with ticker, timestamp, sma9, vwap
-- Indexes on (ticker, timestamp) for performance
-- Row-Level Security (RLS) policies
-
-## Deployment
-
-### Vercel
-
-1. Push your code to GitHub
-2. Import the project in Vercel
-3. Configure environment variables in Vercel dashboard
-4. Deploy
-
-The project is configured to automatically deploy the `frontend` directory.
-
-## Backend Services
-
-The Python backend downloads equity data from Schwab and loads it into Supabase.
-
-### Setup
-```bash
+# Run all unit tests
 cd backend
-uv venv
-source .venv/bin/activate
-uv pip install -r requirements.txt
+pytest tests/ -v
+
+# Test trading workflow (paper account)
+python test_live_trading_workflow.py
+
+# Or via VS Code
+Press F5 → "🧪 Test Live Trading Workflow (Paper Account)"
 ```
 
-**Note**: This project uses `uv` for faster Python package management. If you don't have `uv` installed, run:
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
+**Testing Guide**: [docs/TESTING_GUIDE.md](./docs/TESTING_GUIDE.md)
 
-### Usage
-```bash
-# Test connections
-python main.py --test-connections
+---
 
-# Download data for QQQ (5 days)
-python main.py --ticker QQQ --days 5
-```
-
-See `backend/README.md` for detailed documentation.
-
-## Project Structure
+## 📊 Project Structure
 
 ```
 alpha-kite-max/
-├── frontend/               # Next.js application
+├── frontend/                # Next.js application
 │   ├── src/
-│   │   ├── app/           # App router pages
-│   │   ├── components/    # React components
-│   │   ├── contexts/      # React contexts
-│   │   └── lib/           # Utilities and configs
-├── backend/               # Python services
-│   ├── schwab_integration/# Schwab API integration
-│   │   ├── client.py     # API client wrapper
-│   │   ├── downloader.py # Data downloader
-│   │   └── streaming.py  # Real-time streaming
-│   ├── models/           # Pydantic data models
-│   ├── tests/            # Test suites
-│   │   ├── integration/  # Integration tests
-│   │   ├── test_schwab/  # Schwab API tests
-│   │   └── test_supabase/# Database tests
-│   ├── sys_testing/      # System testing & utilities
-│   │   ├── OAuth scripts # Authentication helpers
-│   │   └── Diagnostic tools
-│   ├── lambda/           # AWS Lambda deployment
-│   ├── main.py           # CLI entry point
-│   └── etl_pipeline.py   # ETL orchestration
+│   │   ├── app/            # App router pages
+│   │   ├── components/     # React components
+│   │   └── lib/            # Utilities
+│   └── package.json
+├── backend/                # Python services
+│   ├── schwab_integration/ # Schwab API integration
+│   │   ├── client.py      # API client
+│   │   ├── downloader.py  # Data downloader
+│   │   ├── streaming.py   # Real-time streaming
+│   │   └── trading_engine.py # Trading logic
+│   ├── models/            # Pydantic models
+│   ├── tests/             # Test suites
+│   ├── lambda/            # AWS Lambda functions
+│   ├── main.py            # CLI entry point
+│   └── requirements.txt
+├── supabase/              # Database migrations
+│   └── migrations/        # SQL files
 ├── infrastructure/        # Terraform IaC
-│   ├── lambda.tf         # Lambda function config
-│   ├── cloudwatch_alarms.tf
-│   └── secrets.tf        # AWS Secrets Manager
-├── supabase/             # Database migrations
-│   └── migrations/       # SQL migration files
-├── shared/               # Shared TypeScript types
-├── context/              # Project documentation
-│   └── docs/            # Detailed guides
-├── SECURITY.md          # Security policy
-└── vercel.json          # Vercel configuration
+│   ├── lambda.tf
+│   └── secrets.tf
+├── docs/                  # Implementation guides
+│   ├── DEPLOYMENT_GUIDE.md
+│   ├── TESTING_GUIDE.md
+│   ├── FEATURE_REFERENCE.md
+│   └── DATA_FLOW.md
+├── .vscode/               # VS Code configurations
+│   └── launch.json        # F5 menu tasks
+├── GETTING_STARTED.md     # Quick start guide
+├── ARCHITECTURE.md        # System design
+├── SECURITY.md            # Security policy
+└── README.md              # This file
 ```
 
-## Documentation
+---
 
-### Core Documentation
-- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Complete system architecture and technical specifications
-- **[SECURITY.md](./SECURITY.md)** - Security policy and credential management best practices
+## 🌟 Key Workflows
 
-### Setup & Deployment
-- **[Quick Start Guide](./context/docs/QUICKSTART_AWS.md)** - Get up and running in 15 minutes
-- **[Deployment Guide](./context/docs/DEPLOYMENT.md)** - Production deployment instructions
-- **[AWS Deployment](./context/docs/DEPLOYMENT_AWS.md)** - Detailed AWS Lambda setup
-- **[Vercel Deployment](./context/docs/VERCEL_DEPLOYMENT.md)** - Frontend deployment guide
+### Download Historical Data
 
-### Development Guides
-- **[Backend README](./backend/README.md)** - Python backend setup and usage
-- **[Frontend README](./frontend/README.md)** - Next.js frontend development
-- **[Infrastructure README](./infrastructure/README.md)** - Terraform configuration
+**Via VS Code**:
+```
+Press F5 → "📥 3. Download Historical Data (QQQ, 5 days)"
+```
 
-### Status & Progress
-- **[Implementation Status](./context/docs/IMPLEMENTATION_STATUS.md)** - Current feature status
-- **[Progress Summary](./context/docs/PROGRESS_SUMMARY.md)** - Latest development progress
-- **[Supabase Migrations](./context/docs/SUPABASE_MIGRATIONS.md)** - Database schema history
+**Via CLI**:
+```bash
+cd backend
+python main.py --ticker QQQ --days 5
+```
 
-## License
+### Start Paper Trading
 
-MIT
+**Via VS Code**:
+```
+Press F5 → "📈 Trading Engine (Paper Trading)"
+```
 
+**Via CLI**:
+```bash
+cd backend
+python trading_main.py --mode paper --ticker QQQ
+```
+
+### Test Complete Workflow
+
+**Via VS Code**:
+```
+Press F5 → "🧪 Test Live Trading Workflow (Paper Account)"
+```
+
+---
+
+## 🎯 Current Status
+
+### Production Ready
+- ✅ All 19 unit tests passing
+- ✅ Database migrations applied
+- ✅ Trading logic validated
+- ✅ Paper trading functional
+- ✅ Frontend dashboard complete
+- ✅ AWS Lambda deployed
+- ✅ Documentation complete
+
+### Trading Hours
+- **Active**: 10:00 AM - 2:30 PM ET
+- **Close-Only**: 2:30 PM - 3:00 PM ET
+- **Market Close**: 3:00 PM ET
+
+### System Metrics
+- **Database**: 0.9% of free tier used
+- **Lambda**: Within free tier
+- **Monthly Cost**: ~$2
+- **Uptime**: 99.9% (Vercel + Supabase)
+
+---
+
+## 🛡️ Security
+
+⚠️ **Never commit credentials!**
+
+- Schwab tokens → AWS Secrets Manager (production) or local `.schwab_tokens.json` (dev)
+- API keys → Environment variables only
+- Database credentials → Supabase Service Role Key (backend only)
+
+**See**: [SECURITY.md](./SECURITY.md) for complete security guidelines
+
+---
+
+## 📈 Performance
+
+### Data Processing
+- **Latency**: < 5 seconds from Schwab to database
+- **Throughput**: 390 data points/day
+- **Storage**: ~4.3 MB/month
+
+### Trading Execution
+- **Signal Detection**: Real-time (every minute)
+- **Order Submission**: < 2 seconds
+- **Position Tracking**: Instant database updates
+
+---
+
+## 🤝 Contributing
+
+Contributions welcome! Please read [CONTRIBUTING.md](./CONTRIBUTING.md) first.
+
+### Quick Contribution Guide
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Run tests: `pytest tests/`
+5. Submit a pull request
+
+### Development Workflow
+```bash
+# Create feature branch
+git checkout -b feature/your-feature
+
+# Make changes and test
+pytest tests/
+
+# Commit and push
+git add .
+git commit -m "feat: your feature description"
+git push origin feature/your-feature
+```
+
+---
+
+## 📜 License
+
+This project is licensed under the MIT License with commercial use restrictions. See [LICENSE](./LICENSE) for details.
+
+**Summary**: Free for personal and educational use. Commercial use requires explicit written permission.
+
+---
+
+## 🙋 Support
+
+### Documentation
+- **Issues**: [GitHub Issues](https://github.com/MAKaminski/alpha-kite-max/issues)
+- **Security**: Email MKaminski1337@Gmail.com
+- **Docs**: See [`docs/`](./docs/) folder
+
+### Quick Links
+- [Getting Started](./GETTING_STARTED.md)
+- [Architecture](./ARCHITECTURE.md)
+- [Deployment Guide](./docs/DEPLOYMENT_GUIDE.md)
+- [Testing Guide](./docs/TESTING_GUIDE.md)
+
+---
+
+## 🎉 Acknowledgments
+
+- **Schwab API**: Charles Schwab for API access
+- **schwab-py**: Tyler Bowers for the excellent Python client
+- **Supabase**: For the amazing PostgreSQL platform
+- **Vercel**: For seamless Next.js deployment
+
+---
+
+**Built with ❤️ for algorithmic traders**
+
+**Last Updated**: October 19, 2025

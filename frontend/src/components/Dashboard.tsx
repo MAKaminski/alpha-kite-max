@@ -368,39 +368,39 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-4 md:p-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-2 md:p-4">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 mb-6">
-          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 mb-6">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-3 mb-3">
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-2 mb-3">
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white">
               Trading Dashboard
             </h1>
             
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 flex-wrap">
               {realTimeClockEnabled && <ESTClock />}
               
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              <div className="flex items-center gap-1">
+                <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
                   Ticker:
                 </label>
                 <input
                   type="text"
                   value={ticker}
                   onChange={(e) => setTicker(e.target.value.toUpperCase())}
-                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter ticker"
+                  className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-1 focus:ring-blue-500"
+                  placeholder="QQQ"
                 />
               </div>
 
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              <div className="flex items-center gap-1">
+                <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
                   Period:
                 </label>
                 <select
                   value={period}
                   onChange={(e) => setPeriod(e.target.value as 'minute' | 'hour')}
-                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-1 focus:ring-blue-500"
                 >
                   <option value="minute">Minute</option>
                   <option value="hour">Hour</option>
@@ -412,43 +412,43 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Metrics Row */}
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
-              <div className="text-sm font-medium text-blue-600 dark:text-blue-400">Ticker</div>
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">{ticker}</div>
+          {/* Metrics Row - More Compact */}
+          <div className="grid grid-cols-3 lg:grid-cols-5 gap-2 mb-2">
+            <div className="bg-blue-50 dark:bg-blue-900/20 rounded p-2">
+              <div className="text-[10px] font-medium text-blue-600 dark:text-blue-400">Ticker</div>
+              <div className="text-base font-bold text-gray-900 dark:text-white">{ticker}</div>
             </div>
-            <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
-              <div className="text-sm font-medium text-green-600 dark:text-green-400">SMA9</div>
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">
+            <div className="bg-green-50 dark:bg-green-900/20 rounded p-2">
+              <div className="text-[10px] font-medium text-green-600 dark:text-green-400">SMA9</div>
+              <div className="text-base font-bold text-gray-900 dark:text-white">
                 {displayData.length > 0 ? `$${displayData[displayData.length - 1].sma9.toFixed(2)}` : '-'}
               </div>
             </div>
-            <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4">
-              <div className="text-sm font-medium text-purple-600 dark:text-purple-400">VWAP</div>
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">
+            <div className="bg-purple-50 dark:bg-purple-900/20 rounded p-2">
+              <div className="text-[10px] font-medium text-purple-600 dark:text-purple-400">VWAP</div>
+              <div className="text-base font-bold text-gray-900 dark:text-white">
                 {displayData.length > 0 ? `$${displayData[displayData.length - 1].vwap.toFixed(2)}` : '-'}
               </div>
             </div>
-            <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4">
-              <div className="text-sm font-medium text-red-600 dark:text-red-400">Crosses Today</div>
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">
+            <div className="bg-red-50 dark:bg-red-900/20 rounded p-2">
+              <div className="text-[10px] font-medium text-red-600 dark:text-red-400">Crosses</div>
+              <div className="text-base font-bold text-gray-900 dark:text-white">
                 {todayCrosses.length}
               </div>
             </div>
-            <div className="bg-gray-50 dark:bg-gray-900/20 rounded-lg p-4">
-              <div className="text-sm font-medium text-gray-600 dark:text-gray-400">Period</div>
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">Minutes</div>
+            <div className="bg-gray-50 dark:bg-gray-900/20 rounded p-2">
+              <div className="text-[10px] font-medium text-gray-600 dark:text-gray-400">Period</div>
+              <div className="text-base font-bold text-gray-900 dark:text-white">Min</div>
             </div>
           </div>
 
-          {/* Date Navigation */}
-          <div className="flex items-center gap-4 justify-center">
+          {/* Date Navigation - Compact */}
+          <div className="flex items-center gap-2 justify-center">
             <button
               onClick={goToPreviousDay}
-              className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              className="px-2 py-1 text-xs bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
             >
-              ← Previous Day
+              ← Prev
             </button>
             
             <div className="relative">
@@ -456,21 +456,21 @@ export default function Dashboard() {
                 selected={selectedDate}
                 onChange={(date) => date && setSelectedDate(date)}
                 dateFormat="MMM dd, yyyy"
-                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center cursor-pointer"
+                className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-1 focus:ring-blue-500 text-center cursor-pointer"
               />
             </div>
             
             <button
               onClick={goToNextDay}
-              className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              className="px-2 py-1 text-xs bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
             >
-              Next Day →
+              Next →
             </button>
           </div>
         </div>
 
         {/* Chart */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 mb-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-3 mb-3">
           {loading && (
             <div className="flex items-center justify-center h-96">
               <div className="text-lg text-gray-600 dark:text-gray-400">Loading chart data...</div>

@@ -46,17 +46,46 @@ export async function POST(request: NextRequest) {
     //   body: JSON.stringify({ ticker, date, startDate, endDate, mode })
     // });
 
-    // Mock successful download
-    const rowCount = mode === 'single' ? 390 : 2000; // ~390 minutes per day
+    // Calculate row count based on date range
+    let rowCount = 390; // ~390 minutes per day (10 AM - 3 PM = 300 mins)
+    
+    if (mode === 'range' && startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      rowCount = daysDiff * 390;
+    }
     
     if (target === 'csv') {
-      // Generate mock CSV data
-      const csvData = [
-        'timestamp,ticker,price,volume,sma9,vwap',
-        '2025-10-19 10:00:00,QQQ,600.25,15000,600.12,600.18',
-        '2025-10-19 10:01:00,QQQ,600.28,18000,600.15,600.20',
-        '2025-10-19 10:02:00,QQQ,600.30,12000,600.18,600.22'
-      ].join('\n');
+      // Generate mock CSV data with proper date range
+      const csvRows = ['timestamp,ticker,price,volume,sma9,vwap'];
+      
+      if (mode === 'single' && date) {
+        // Single day data
+        for (let i = 0; i < 3; i++) {
+          const hour = 10 + Math.floor(i / 60);
+          const minute = i % 60;
+          csvRows.push(`${date} ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00,${ticker},${(600 + Math.random() * 10).toFixed(2)},${Math.floor(15000 + Math.random() * 5000)},${(600 + Math.random() * 10).toFixed(2)},${(600 + Math.random() * 10).toFixed(2)}`);
+        }
+      } else if (mode === 'range' && startDate && endDate) {
+        // Date range data
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        let currentDate = new Date(start);
+        
+        while (currentDate <= end) {
+          const dateStr = currentDate.toISOString().split('T')[0];
+          // Add a few sample rows for each day
+          for (let i = 0; i < 3; i++) {
+            const hour = 10 + Math.floor(i / 60);
+            const minute = i % 60;
+            csvRows.push(`${dateStr} ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00,${ticker},${(600 + Math.random() * 10).toFixed(2)},${Math.floor(15000 + Math.random() * 5000)},${(600 + Math.random() * 10).toFixed(2)},${(600 + Math.random() * 10).toFixed(2)}`);
+          }
+          currentDate.setDate(currentDate.getDate() + 1);
+        }
+      }
+      
+      const csvData = csvRows.join('\n');
       
       return NextResponse.json({
         success: true,
