@@ -509,6 +509,13 @@ export default function Dashboard() {
           )}
         </div>
 
+        {/* Data Management Dashboard */}
+        {!loading && !error && (
+          <div className="mb-6">
+            <DataManagementDashboard />
+          </div>
+        )}
+
         {/* Trading Dashboard */}
         {!loading && !error && tradingDashboardEnabled && (
           <TradingDashboard ticker={ticker} selectedDate={selectedDate} />
