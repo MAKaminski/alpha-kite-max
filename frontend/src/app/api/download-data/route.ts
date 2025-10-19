@@ -11,7 +11,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { ticker, date, startDate, endDate, mode } = body;
+    const { ticker, date, startDate, endDate, mode, target } = body;
 
     // Validate inputs
     if (!ticker) {
@@ -49,16 +49,38 @@ export async function POST(request: NextRequest) {
     // Mock successful download
     const rowCount = mode === 'single' ? 390 : 2000; // ~390 minutes per day
     
-    return NextResponse.json({
-      success: true,
-      message: `Successfully downloaded data for ${ticker}`,
-      ticker,
-      mode,
-      date: mode === 'single' ? date : undefined,
-      startDate: mode === 'range' ? startDate : undefined,
-      endDate: mode === 'range' ? endDate : undefined,
-      rowCount
-    });
+    if (target === 'csv') {
+      // Generate mock CSV data
+      const csvData = [
+        'timestamp,ticker,price,volume,sma9,vwap',
+        '2025-10-19 10:00:00,QQQ,600.25,15000,600.12,600.18',
+        '2025-10-19 10:01:00,QQQ,600.28,18000,600.15,600.20',
+        '2025-10-19 10:02:00,QQQ,600.30,12000,600.18,600.22'
+      ].join('\n');
+      
+      return NextResponse.json({
+        success: true,
+        message: `CSV file generated for ${ticker}`,
+        ticker,
+        mode,
+        target,
+        csvData,
+        rowCount
+      });
+    } else {
+      // Database save (default)
+      return NextResponse.json({
+        success: true,
+        message: `Successfully saved ${rowCount} rows to database for ${ticker}`,
+        ticker,
+        mode,
+        target,
+        date: mode === 'single' ? date : undefined,
+        startDate: mode === 'range' ? startDate : undefined,
+        endDate: mode === 'range' ? endDate : undefined,
+        rowCount
+      });
+    }
 
   } catch (error) {
     console.error('Error in download-data route:', error);
