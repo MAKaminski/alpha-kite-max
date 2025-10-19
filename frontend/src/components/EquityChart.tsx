@@ -9,12 +9,35 @@ import React, { memo } from 'react';
 import { Bar, BarChart, CartesianGrid, ComposedChart, Legend, Line, ReferenceArea, ResponsiveContainer, Scatter, Tooltip, XAxis, YAxis } from 'recharts';
 import { ChartDataPoint } from '../../../shared/types';
 
+interface SyntheticOptionPrice {
+  id: number;
+  timestamp: string;
+  ticker: string;
+  option_symbol: string;
+  option_type: string;
+  strike_price: number;
+  expiration_date: string;
+  spot_price: number;
+  market_price: number;
+  bid: number;
+  ask: number;
+  volume: number;
+  open_interest: number;
+  implied_volatility: number;
+  delta: number;
+  gamma: number;
+  theta: number;
+  vega: number;
+  data_source: string;
+}
+
 interface EquityChartProps {
   data: ChartDataPoint[];
   ticker: string;
   crosses: Cross[];
   optionPrices?: TradeOptionPrice[];
   realTimeOptionPrices?: RealTimeOptionPrice[];
+  syntheticOptionPrices?: SyntheticOptionPrice[];
   showNonMarketHours?: boolean;
   onToggleNonMarketHours?: (show: boolean) => void;
   marketHoursHighlighting?: boolean;
@@ -27,6 +50,7 @@ function EquityChart({
   crosses, 
   optionPrices = [], 
   realTimeOptionPrices = [],
+  syntheticOptionPrices = [],
   showNonMarketHours = false,
   onToggleNonMarketHours,
   marketHoursHighlighting = true,
@@ -77,6 +101,7 @@ function EquityChart({
         const cross = (crosses || []).find(c => c.timestamp === point.timestamp);
         const optionPrice = (optionPrices || []).find(op => op.timestamp === point.timestamp);
         const realTimeOption = (realTimeOptionPrices || []).find(rt => rt.timestamp === point.timestamp);
+        const syntheticOption = (syntheticOptionPrices || []).find(so => so.timestamp === point.timestamp);
         
         return {
           ...point,
@@ -86,7 +111,10 @@ function EquityChart({
           optionType: realTimeOption ? 'PUT' : 
                      optionPrice ? optionPrice.option_type : null,
           optionSymbol: realTimeOption ? `${ticker}_PUT_${realTimeOption.put_strike}` : 
-                       optionPrice ? optionPrice.option_symbol : null
+                       optionPrice ? optionPrice.option_symbol : null,
+          syntheticOptionPrice: syntheticOption ? syntheticOption.market_price : null,
+          syntheticOptionType: syntheticOption ? syntheticOption.option_type : null,
+          syntheticOptionSymbol: syntheticOption ? syntheticOption.option_symbol : null
         };
       } catch (error) {
         console.warn('Error processing chart point:', error);
@@ -95,11 +123,14 @@ function EquityChart({
           crossMarker: null,
           optionPrice: null,
           optionType: null,
-          optionSymbol: null
+          optionSymbol: null,
+          syntheticOptionPrice: null,
+          syntheticOptionType: null,
+          syntheticOptionSymbol: null
         };
       }
     });
-  }, [filteredData, crosses, optionPrices, realTimeOptionPrices, ticker]);
+  }, [filteredData, crosses, optionPrices, realTimeOptionPrices, syntheticOptionPrices, ticker]);
 
   // Get market hours segments for background shading
   const marketSegments = React.useMemo(() => {
@@ -124,9 +155,21 @@ function EquityChart({
   return (
     <div className="space-y-2">
       <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-              Chart | SMA9, Session VWAP ({period === 'minute' ? 'Minute' : 'Hour'} Data)
-            </h2>
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                Chart | SMA9, Session VWAP ({period === 'minute' ? 'Minute' : 'Hour'} Data)
+              </h2>
+              {(syntheticOptionPrices && syntheticOptionPrices.length > 0) && (
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                    🧮 SYNTHETIC OPTIONS DATA (Black-Scholes Model)
+                  </span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    • Real data: Solid markers • Synthetic data: Dashed markers
+                  </span>
+                </div>
+              )}
+            </div>
         <div className="flex items-center gap-4">
           <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
             <input
@@ -220,7 +263,7 @@ function EquityChart({
                 isAnimationActive={false}
               />
               
-              {/* Option price markers */}
+              {/* Real option price markers */}
               {optionPrices && optionPrices.length > 0 && (
                 <Scatter
                   dataKey="optionPrice"
@@ -262,7 +305,64 @@ function EquityChart({
                       return <circle cx={0} cy={0} r={0} fill="transparent" />;
                     }
                   }}
-                  name="Option Prices"
+                  name="Real Option Prices"
+                />
+              )}
+
+              {/* Synthetic option price markers */}
+              {syntheticOptionPrices && syntheticOptionPrices.length > 0 && (
+                <Scatter
+                  dataKey="syntheticOptionPrice"
+                  fill="#F59E0B"
+                  shape={(props: unknown) => {
+                    try {
+                      const { cx, cy, payload } = props as { cx: number; cy: number; payload: { syntheticOptionPrice?: number; syntheticOptionType?: string } };
+                      if (!payload?.syntheticOptionPrice) {
+                        return <circle cx={0} cy={0} r={0} fill="transparent" />;
+                      }
+                      
+                      const color = payload.syntheticOptionType === 'CALL' ? '#F59E0B' : '#EF4444';
+                      const symbol = payload.syntheticOptionType === 'CALL' ? 'C' : 'P';
+                      
+                      return (
+                        <g>
+                          <circle
+                            cx={cx}
+                            cy={cy}
+                            r={6}
+                            fill={color}
+                            stroke="#FFF"
+                            strokeWidth={2}
+                            strokeDasharray="3 3"
+                          />
+                          <text
+                            x={cx}
+                            y={cy + 3}
+                            textAnchor="middle"
+                            fill="#FFF"
+                            fontSize="8"
+                            fontWeight="bold"
+                          >
+                            {symbol}
+                          </text>
+                          <text
+                            x={cx}
+                            y={cy - 8}
+                            textAnchor="middle"
+                            fill="#FFF"
+                            fontSize="6"
+                            fontWeight="bold"
+                          >
+                            SYN
+                          </text>
+                        </g>
+                      );
+                    } catch (error) {
+                      console.warn('Error rendering synthetic option marker:', error);
+                      return <circle cx={0} cy={0} r={0} fill="transparent" />;
+                    }
+                  }}
+                  name="Synthetic Option Prices"
                 />
               )}
             </ComposedChart>
