@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, memo } from 'react';
 import { formatToEST } from '@/lib/timezone';
+import OptionsDownloadPanel from './OptionsDownloadPanel';
 
 interface DataFeedItem {
   timestamp: string;
@@ -14,9 +15,13 @@ interface DataFeedItem {
 
 interface DataManagementDashboardProps {
   ticker?: string;
+  selectedDate?: Date;
 }
 
-function DataManagementDashboard({ ticker: initialTicker = 'QQQ' }: DataManagementDashboardProps) {
+function DataManagementDashboard({ 
+  ticker: initialTicker = 'QQQ',
+  selectedDate = new Date()
+}: DataManagementDashboardProps) {
   // Download Controls State
   const [ticker, setTicker] = useState(initialTicker);
   const [singleDate, setSingleDate] = useState('');
@@ -208,7 +213,7 @@ function DataManagementDashboard({ ticker: initialTicker = 'QQQ' }: DataManageme
         Data Management
       </h2>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-2">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-2">
         {/* Historical Data Download Panel */}
         <div className="bg-gray-50 dark:bg-gray-900 rounded p-2 border border-gray-200 dark:border-gray-700">
           <h3 className="text-xs font-semibold text-gray-900 dark:text-white mb-1 flex items-center">
@@ -393,6 +398,9 @@ function DataManagementDashboard({ ticker: initialTicker = 'QQQ' }: DataManageme
           </div>
         </div>
 
+        {/* Options Download Panel */}
+        <OptionsDownloadPanel ticker={ticker} selectedDate={selectedDate} />
+
         {/* Info Panel */}
         <div className="bg-blue-50 dark:bg-blue-900/20 rounded p-2 border border-blue-200 dark:border-blue-800">
           <h4 className="text-xs font-semibold text-blue-900 dark:text-blue-300 mb-1">
@@ -400,9 +408,10 @@ function DataManagementDashboard({ ticker: initialTicker = 'QQQ' }: DataManageme
           </h4>
           <ul className="text-[9px] text-blue-800 dark:text-blue-400 space-y-0.5 list-disc list-inside">
             <li><strong>Day</strong>: Specific date</li>
-            <li><strong>Range</strong>: Multiple days (max 10)</li>
+            <li><strong>Range</strong>: Multiple days</li>
             <li><strong>DB</strong>: Saves to database</li>
             <li><strong>CSV</strong>: Downloads file</li>
+            <li><strong>Options</strong>: 0DTE strikes via Polygon</li>
             <li><strong>Stream</strong>: 10 AM - 3 PM ET</li>
           </ul>
         </div>
