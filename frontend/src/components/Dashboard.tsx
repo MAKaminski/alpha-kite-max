@@ -25,7 +25,7 @@ export default function Dashboard() {
   const [todayCrosses, setTodayCrosses] = useState<Cross[]>([]);
   const [optionPrices, setOptionPrices] = useState<TradeOptionPrice[]>([]);
   const [realTimeOptionPrices, setRealTimeOptionPrices] = useState<RealTimeOptionPrice[]>([]);
-  const [showNonMarketHours, setShowNonMarketHours] = useState(true);
+  const [showNonMarketHours, setShowNonMarketHours] = useState(false);
   const [period, setPeriod] = useState<'minute' | 'hour'>('minute');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

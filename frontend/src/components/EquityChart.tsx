@@ -27,7 +27,7 @@ export default function EquityChart({
   crosses, 
   optionPrices = [], 
   realTimeOptionPrices = [],
-  showNonMarketHours = true,
+  showNonMarketHours = false,
   onToggleNonMarketHours,
   marketHoursHighlighting = true,
   period = 'minute'
