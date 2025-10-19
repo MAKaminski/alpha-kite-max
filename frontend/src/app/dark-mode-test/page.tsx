@@ -290,7 +290,7 @@ export default function DarkModeTestPage() {
               Check: All components use dark: prefixed classes
             </code>
             <code className="block bg-blue-100 dark:bg-blue-950 p-2 rounded text-xs font-mono">
-              Check: tailwind.config.ts has darkMode: 'class'
+              Check: tailwind.config.ts has darkMode: &apos;class&apos;
             </code>
           </div>
         </div>
