@@ -270,7 +270,7 @@ export default function DarkModeTestPage() {
               </h4>
               <p className="text-sm text-green-800 dark:text-green-400">
                 Every element above should have inverted colors when toggling dark mode.
-                If ANY element doesn't change, dark mode has incomplete coverage.
+                If ANY element does not change, dark mode has incomplete coverage.
               </p>
             </div>
           </div>
@@ -297,12 +297,12 @@ export default function DarkModeTestPage() {
 
         {/* Back Link */}
         <div className="mt-6 text-center">
-          <a
-            href="/"
+          <button
+            onClick={() => window.location.href = '/'}
             className="inline-block px-6 py-3 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
           >
             ← Back to Dashboard
-          </a>
+          </button>
         </div>
       </div>
     </div>
