@@ -71,8 +71,8 @@ export default function DataManagementDashboard() {
       } else {
         setDownloadStatus(`❌ Error: ${result.error || 'Download failed'}`);
       }
-    } catch (error) {
-      setDownloadStatus(`❌ Error: ${error instanceof Error ? error.message : 'Network error'}`);
+    } catch (err) {
+      setDownloadStatus(`❌ Error: ${err instanceof Error ? err.message : 'Network error'}`);
     } finally {
       setIsDownloading(false);
       setTimeout(() => setDownloadStatus(''), 5000);
@@ -101,7 +101,7 @@ export default function DataManagementDashboard() {
           setStreamingStatus('❌ Failed to start');
           setIsStreaming(false);
         }
-      } catch (error) {
+      } catch {
         setStreamingStatus('❌ Connection error');
         setIsStreaming(false);
       }
@@ -118,7 +118,7 @@ export default function DataManagementDashboard() {
 
         setStreamingStatus('⚫ Stopped');
         stopDataFeed();
-      } catch (error) {
+      } catch {
         setStreamingStatus('⚫ Stopped (with errors)');
         stopDataFeed();
       }
