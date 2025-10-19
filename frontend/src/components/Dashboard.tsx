@@ -511,8 +511,8 @@ export default function Dashboard() {
 
         {/* Data Management Dashboard */}
         {!loading && !error && (
-          <div className="mb-6">
-            <DataManagementDashboard />
+          <div className="mb-3">
+            <DataManagementDashboard ticker={ticker} />
           </div>
         )}
 

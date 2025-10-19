@@ -5,7 +5,7 @@ import { getMarketHoursSegments, isRegularTradingHours } from '@/lib/marketHours
 import { TradeOptionPrice, getOptionPriceColor, getOptionPriceSymbol } from '@/lib/optionPrices';
 import { RealTimeOptionPrice } from '@/lib/realTimeOptions';
 import { formatToEST } from '@/lib/timezone';
-import React from 'react';
+import React, { memo } from 'react';
 import { Bar, BarChart, CartesianGrid, ComposedChart, Legend, Line, ReferenceArea, ResponsiveContainer, Scatter, Tooltip, XAxis, YAxis } from 'recharts';
 import { ChartDataPoint } from '../../../shared/types';
 
@@ -21,7 +21,7 @@ interface EquityChartProps {
   period?: 'minute' | 'hour';
 }
 
-export default function EquityChart({ 
+function EquityChart({ 
   data, 
   ticker, 
   crosses, 
@@ -322,3 +322,5 @@ export default function EquityChart({
   );
 }
 
+// Export memoized version to prevent unnecessary re-renders when parent re-renders
+export default memo(EquityChart);

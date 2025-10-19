@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, memo } from 'react';
 import { formatToEST } from '@/lib/timezone';
 
 interface DataFeedItem {
@@ -12,9 +12,13 @@ interface DataFeedItem {
   vwap?: number;
 }
 
-export default function DataManagementDashboard() {
+interface DataManagementDashboardProps {
+  ticker?: string;
+}
+
+function DataManagementDashboard({ ticker: initialTicker = 'QQQ' }: DataManagementDashboardProps) {
   // Download Controls State
-  const [ticker, setTicker] = useState('QQQ');
+  const [ticker, setTicker] = useState(initialTicker);
   const [singleDate, setSingleDate] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -407,3 +411,5 @@ export default function DataManagementDashboard() {
   );
 }
 
+// Export memoized version to prevent unnecessary re-renders
+export default memo(DataManagementDashboard);
