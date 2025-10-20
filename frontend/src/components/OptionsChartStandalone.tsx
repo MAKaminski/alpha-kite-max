@@ -7,9 +7,13 @@ type OptionRow = {
   timestamp: string;
   market_price: number;
 };
+type ChartPoint = {
+  timestamp: string;
+  optionPrice: number;
+};
 
 export default function OptionsChartStandalone() {
-  const [data, setData] = React.useState<OptionRow[]>([]);
+  const [data, setData] = React.useState<ChartPoint[]>([]);
   const [date, setDate] = React.useState<string>(new Date('2025-10-17').toISOString().slice(0,10));
   const ticker = 'QQQ';
 
@@ -26,7 +30,7 @@ export default function OptionsChartStandalone() {
         byMinute[minute].sum += r.market_price;
         byMinute[minute].count += 1;
       }
-      const series = Object.entries(byMinute).map(([ts, agg]) => ({ timestamp: ts, optionPrice: agg.sum / agg.count }));
+      const series: ChartPoint[] = Object.entries(byMinute).map(([ts, agg]) => ({ timestamp: ts, optionPrice: agg.sum / agg.count }));
       series.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
       setData(series);
     };
