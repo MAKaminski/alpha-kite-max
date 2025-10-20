@@ -62,19 +62,25 @@ export async function GET(request: NextRequest) {
       data_source?: string;
     }
     
-    const optionsData = (data || []).map((row: SupabaseOptionRow) => ({
+    const optionsData = (data || []).map((row: SupabaseOptionRow & { id?: number; expiration_date?: string; bid?: string; ask?: string; volume?: number; open_interest?: number }) => ({
+      id: row.id || 0,
       timestamp: row.timestamp,
       ticker: row.ticker,
       option_symbol: row.option_symbol,
       option_type: row.option_type,
       strike_price: parseFloat(row.strike_price),
-      market_price: parseFloat(row.market_price),
+      expiration_date: row.expiration_date || row.timestamp.split('T')[0],
       spot_price: parseFloat(row.spot_price),
+      market_price: parseFloat(row.market_price),
+      bid: parseFloat(row.bid || row.market_price),
+      ask: parseFloat(row.ask || row.market_price),
+      volume: row.volume || 0,
+      open_interest: row.open_interest || 0,
+      implied_volatility: parseFloat(row.implied_volatility),
       delta: parseFloat(row.delta),
       gamma: parseFloat(row.gamma),
       theta: parseFloat(row.theta),
       vega: parseFloat(row.vega),
-      implied_volatility: parseFloat(row.implied_volatility),
       data_source: row.data_source || 'black_scholes_synthetic',
     }));
 

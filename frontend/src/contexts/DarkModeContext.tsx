@@ -28,12 +28,17 @@ export function DarkModeProvider({ children }: { children: React.ReactNode }) {
     // Apply dark mode class to document
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
+      document.body.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
+      document.body.classList.remove('dark');
     }
     
     // Save preference to localStorage
     localStorage.setItem('darkMode', isDarkMode.toString());
+    
+    // Force a style recalculation to ensure all components update
+    document.documentElement.style.colorScheme = isDarkMode ? 'dark' : 'light';
   }, [isDarkMode]);
 
   const toggleDarkMode = () => {
