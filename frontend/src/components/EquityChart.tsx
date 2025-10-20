@@ -76,8 +76,8 @@ function EquityChart({
   syntheticOptionPrices = [],
   showNonMarketHours = false,
   onToggleNonMarketHours,
-  showSyntheticOptions: _showSyntheticOptions = true,
-  onToggleSyntheticOptions: _onToggleSyntheticOptions,
+  showSyntheticOptions = true,
+  onToggleSyntheticOptions,
   marketHoursHighlighting = true,
   period = 'minute',
   trades = [],
@@ -117,7 +117,10 @@ function EquityChart({
     return '';
   };
 
-  const formatPrice = (value: number) => `$${value.toFixed(2)}`;
+  const formatPrice = (value: number | string | null | undefined) => {
+    const numValue = typeof value === 'number' ? value : parseFloat(String(value || 0));
+    return `$${numValue.toFixed(2)}`;
+  };
 
   // Safely filter data based on showNonMarketHours setting
   const filteredData = React.useMemo(() => {
@@ -327,13 +330,14 @@ function EquityChart({
   }, [data]);
 
   // Format volume for display
-  const formatVolume = (value: number) => {
-    if (value >= 1000000) {
-      return `${(value / 1000000).toFixed(1)}M`;
-    } else if (value >= 1000) {
-      return `${(value / 1000).toFixed(1)}K`;
+  const formatVolume = (value: number | string | null | undefined) => {
+    const numValue = typeof value === 'number' ? value : parseFloat(String(value || 0));
+    if (numValue >= 1000000) {
+      return `${(numValue / 1000000).toFixed(1)}M`;
+    } else if (numValue >= 1000) {
+      return `${(numValue / 1000).toFixed(1)}K`;
     }
-    return value.toString();
+    return numValue.toString();
   };
 
   return (
@@ -401,7 +405,7 @@ function EquityChart({
           <YAxis
             yAxisId="right"
             orientation="right"
-            tickFormatter={(value) => `$${value.toFixed(2)}`}
+            tickFormatter={(value) => formatPrice(value)}
             stroke="#F59E0B"
             style={{ fontSize: '12px' }}
             domain={['auto', 'auto']}
@@ -415,20 +419,24 @@ function EquityChart({
               color: '#F9FAFB',
             }}
             labelFormatter={(label) => `${formatToEST(label, 'h:mm:ss a')} EST`}
-            formatter={(value: number, name: string) => {
+            formatter={(value: number | string | null | undefined, name: string) => {
+              const numValue = typeof value === 'number' ? value : parseFloat(String(value || 0));
               if (name === 'syntheticOptionPrice') {
-                return [`$${value.toFixed(2)}`, 'Option Price'];
+                return [formatPrice(numValue), 'Option Price'];
               }
               if (name === 'price') {
-                return [`$${value.toFixed(2)}`, `${ticker} Price`];
+                return [formatPrice(numValue), `${ticker} Price`];
               }
               if (name === 'sma9') {
-                return [`$${value.toFixed(2)}`, 'SMA9'];
+                return [formatPrice(numValue), 'SMA9'];
               }
               if (name === 'vwap') {
-                return [`$${value.toFixed(2)}`, 'Session VWAP'];
+                return [formatPrice(numValue), 'Session VWAP'];
               }
-              return [`$${value.toFixed(2)}`, name];
+              if (name === 'accountBalance') {
+                return [formatPrice(numValue), 'Account Balance'];
+              }
+              return [formatPrice(numValue), name];
             }}
           />
           <Legend
