@@ -12,11 +12,11 @@ type OptionRow = {
 };
 type ChartPoint = {
   timestamp: string;
-  optionPrice: number;
+  [series: string]: string | number;
 };
 
 export default function OptionsChartStandalone() {
-  const [data, setData] = React.useState<any[]>([]);
+  const [data, setData] = React.useState<ChartPoint[]>([]);
   const [date, setDate] = React.useState<string>(new Date('2025-10-17').toISOString().slice(0,10));
   const [showCalls, setShowCalls] = React.useState(true);
   const [showPuts, setShowPuts] = React.useState(true);
@@ -29,7 +29,7 @@ export default function OptionsChartStandalone() {
     const load = async () => {
       const res = await fetch(`/api/get-options-for-chart?ticker=${ticker}&date=${date}`);
       const json = await res.json();
-      const rows: OptionRow[] = (json.data || []).map((r: any) => ({
+      const rows: OptionRow[] = (json.data || []).map((r: { timestamp: string; market_price: number; option_symbol: string; option_type: 'CALL'|'PUT'; strike_price: number }) => ({
         timestamp: r.timestamp,
         market_price: Number(r.market_price),
         option_symbol: r.option_symbol,
@@ -72,11 +72,11 @@ export default function OptionsChartStandalone() {
         bucket[minute][r.option_symbol].sum += r.market_price;
         bucket[minute][r.option_symbol].count += 1;
       }
-      const rowsWide = Object.entries(bucket).map(([ts, symbols]) => {
-        const row:any = { timestamp: ts };
+      const rowsWide: ChartPoint[] = Object.entries(bucket).map(([ts, symbols]) => {
+        const row: ChartPoint = { timestamp: ts };
         for (const sym of Object.keys(symbols)) {
           const agg = symbols[sym];
-          row[sym] = agg.sum / agg.count;
+          (row as any)[sym] = agg.sum / agg.count;
         }
         return row;
       }).sort((a,b)=>a.timestamp.localeCompare(b.timestamp));

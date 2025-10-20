@@ -53,14 +53,14 @@ export default function Dashboard() {
   const [period, setPeriod] = useState<'minute' | 'hour'>('minute');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showAdminPanel, setShowAdminPanel] = useState(false);
+  // Admin panel is now inline on Admin tab; keep state removed
 
   // Feature flags
   const realTimeDataEnabled = useFeatureFlag('real-time-data');
   const realTimeClockEnabled = useFeatureFlag('real-time-clock');
   const signalsDashboardEnabled = useFeatureFlag('signals-dashboard');
   const tradingDashboardEnabled = useFeatureFlag('trading-dashboard');
-  const adminPanelEnabled = useFeatureFlag('admin-panel');
+  // const adminPanelEnabled = useFeatureFlag('admin-panel');
   const optionPricesEnabled = useFeatureFlag('option-prices');
   const realTimeOptionsEnabled = useFeatureFlag('real-time-options');
   const crossDetectionEnabled = useFeatureFlag('cross-detection');
