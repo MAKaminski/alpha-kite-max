@@ -36,6 +36,20 @@ interface SyntheticOptionPrice {
   data_source: string;
 }
 
+interface Trade {
+  timestamp: string;
+  action: string;
+  option_symbol: string;
+  price: number;
+}
+
+interface BalanceHistory {
+  timestamp: string;
+  balance: number;
+  cash: number;
+  open_positions: number;
+}
+
 interface EquityChartProps {
   data: ChartDataPoint[];
   ticker: string;
@@ -49,6 +63,8 @@ interface EquityChartProps {
   onToggleSyntheticOptions?: (show: boolean) => void;
   marketHoursHighlighting?: boolean;
   period?: 'minute' | 'hour';
+  trades?: Trade[];
+  balanceHistory?: BalanceHistory[];
 }
 
 function EquityChart({ 
@@ -63,7 +79,9 @@ function EquityChart({
   showSyntheticOptions = true,
   onToggleSyntheticOptions,
   marketHoursHighlighting = true,
-  period = 'minute'
+  period = 'minute',
+  trades = [],
+  balanceHistory = []
 }: EquityChartProps) {
   // Debug logging
   console.log('📊 EquityChart render - syntheticOptionPrices count:', syntheticOptionPrices?.length || 0);
@@ -197,50 +215,115 @@ function EquityChart({
 
   // Select up to 6 option symbols near the median strike and merge as additional series
   const { mergedChartData, optionSeriesKeys } = React.useMemo(() => {
-    if (!syntheticOptionPrices || syntheticOptionPrices.length === 0) {
-      return { mergedChartData: chartData, optionSeriesKeys: [] as string[] };
-    }
-    try {
-      // pick symbols around median strike
-      const strikes = syntheticOptionPrices.map(o => o.strike_price).sort((a,b)=>a-b);
-      const median = strikes[Math.floor(strikes.length/2)] || strikes[0];
-      const bySymbolStrike: Record<string, number> = {};
-      for (const r of syntheticOptionPrices) {
-        bySymbolStrike[r.option_symbol] = r.strike_price;
-      }
-      const selectedSymbols = Object.entries(bySymbolStrike)
-        .sort((a,b)=> Math.abs(a[1]-median) - Math.abs(b[1]-median))
-        .slice(0, 6)
-        .map(([sym]) => sym);
+    let baseChartData = chartData;
+    let selectedSymbols: string[] = [];
 
-      // bucket by minute and symbol
-      const bucket: Record<string, Record<string, { sum:number; count:number }>> = {};
-      for (const r of syntheticOptionPrices) {
-        if (!selectedSymbols.includes(r.option_symbol)) continue;
-        const minute = r.timestamp.slice(0,16)+':00';
-        bucket[minute] = bucket[minute] || {};
-        bucket[minute][r.option_symbol] = bucket[minute][r.option_symbol] || { sum:0, count:0 };
-        bucket[minute][r.option_symbol].sum += r.market_price;
-        bucket[minute][r.option_symbol].count += 1;
-      }
-
-      // merge into chartData by timestamp
-      const byTs = new Map<string, Record<string, unknown>>(chartData.map(row => [row.timestamp, { ...row }]));
-      for (const [ts, symbols] of Object.entries(bucket)) {
-        const row = (byTs.get(ts) as Record<string, unknown>) || ({ timestamp: ts } as Record<string, unknown>);
-        for (const sym of Object.keys(symbols)) {
-          const agg = symbols[sym];
-          (row as Record<string, number | string>)[sym] = agg.sum / agg.count;
+    // Merge synthetic options if available
+    if (syntheticOptionPrices && syntheticOptionPrices.length > 0) {
+      try {
+        // pick symbols around median strike
+        const strikes = syntheticOptionPrices.map(o => o.strike_price).sort((a,b)=>a-b);
+        const median = strikes[Math.floor(strikes.length/2)] || strikes[0];
+        const bySymbolStrike: Record<string, number> = {};
+        for (const r of syntheticOptionPrices) {
+          bySymbolStrike[r.option_symbol] = r.strike_price;
         }
-        byTs.set(ts, row);
+        selectedSymbols = Object.entries(bySymbolStrike)
+          .sort((a,b)=> Math.abs(a[1]-median) - Math.abs(b[1]-median))
+          .slice(0, 6)
+          .map(([sym]) => sym);
+
+        // bucket by minute and symbol
+        const bucket: Record<string, Record<string, { sum:number; count:number }>> = {};
+        for (const r of syntheticOptionPrices) {
+          if (!selectedSymbols.includes(r.option_symbol)) continue;
+          const minute = r.timestamp.slice(0,16)+':00';
+          bucket[minute] = bucket[minute] || {};
+          bucket[minute][r.option_symbol] = bucket[minute][r.option_symbol] || { sum:0, count:0 };
+          bucket[minute][r.option_symbol].sum += r.market_price;
+          bucket[minute][r.option_symbol].count += 1;
+        }
+
+        // merge into chartData by timestamp
+        const byTs = new Map<string, Record<string, unknown>>(chartData.map(row => [row.timestamp, { ...row }]));
+        for (const [ts, symbols] of Object.entries(bucket)) {
+          const row = (byTs.get(ts) as Record<string, unknown>) || ({ timestamp: ts } as Record<string, unknown>);
+          for (const sym of Object.keys(symbols)) {
+            const agg = symbols[sym];
+            (row as Record<string, number | string>)[sym] = agg.sum / agg.count;
+          }
+          byTs.set(ts, row);
+        }
+        baseChartData = Array.from(byTs.values()).sort((a,b)=> (a.timestamp as string).localeCompare(b.timestamp as string));
+      } catch (e) {
+        console.warn('Error merging option series into chart', e);
       }
-      const merged = Array.from(byTs.values()).sort((a,b)=> (a.timestamp as string).localeCompare(b.timestamp as string));
-      return { mergedChartData: merged, optionSeriesKeys: selectedSymbols };
-    } catch (e) {
-      console.warn('Error merging option series into chart', e);
-      return { mergedChartData: chartData, optionSeriesKeys: [] as string[] };
     }
-  }, [chartData, syntheticOptionPrices]);
+
+    // Merge balance history if available
+    if (balanceHistory && balanceHistory.length > 0) {
+      const byTs = new Map<string, Record<string, unknown>>(baseChartData.map(row => [row.timestamp, { ...row }]));
+      
+      for (const balancePoint of balanceHistory) {
+        // Find closest timestamp in chart data (within 1 minute)
+        const balanceTime = new Date(balancePoint.timestamp).getTime();
+        let closestTs: string | null = null;
+        let minDiff = Infinity;
+        
+        for (const row of baseChartData) {
+          const rowTime = new Date(row.timestamp).getTime();
+          const diff = Math.abs(rowTime - balanceTime);
+          if (diff < minDiff && diff < 60000) { // within 1 minute
+            minDiff = diff;
+            closestTs = row.timestamp;
+          }
+        }
+        
+        if (closestTs) {
+          const row = byTs.get(closestTs) as Record<string, unknown>;
+          if (row) {
+            row.accountBalance = balancePoint.balance;
+            row.openPositions = balancePoint.open_positions;
+          }
+        }
+      }
+      
+      baseChartData = Array.from(byTs.values()).sort((a,b)=> (a.timestamp as string).localeCompare(b.timestamp as string));
+    }
+
+    // Add trade markers
+    if (trades && trades.length > 0) {
+      const byTs = new Map<string, Record<string, unknown>>(baseChartData.map(row => [row.timestamp, { ...row }]));
+      
+      for (const trade of trades) {
+        // Find closest timestamp in chart data
+        const tradeTime = new Date(trade.timestamp).getTime();
+        let closestTs: string | null = null;
+        let minDiff = Infinity;
+        
+        for (const row of baseChartData) {
+          const rowTime = new Date(row.timestamp).getTime();
+          const diff = Math.abs(rowTime - tradeTime);
+          if (diff < minDiff && diff < 60000) { // within 1 minute
+            minDiff = diff;
+            closestTs = row.timestamp;
+          }
+        }
+        
+        if (closestTs) {
+          const row = byTs.get(closestTs) as Record<string, unknown>;
+          if (row) {
+            row.tradeMarker = trade.action;
+            row.tradeSymbol = trade.option_symbol;
+          }
+        }
+      }
+      
+      baseChartData = Array.from(byTs.values()).sort((a,b)=> (a.timestamp as string).localeCompare(b.timestamp as string));
+    }
+
+    return { mergedChartData: baseChartData, optionSeriesKeys: selectedSymbols };
+  }, [chartData, syntheticOptionPrices, balanceHistory, trades]);
 
   // Get market hours segments for background shading
   const marketSegments = React.useMemo(() => {
@@ -390,16 +473,72 @@ function EquityChart({
             name="Session VWAP"
             strokeDasharray="5 5"
           />
-              {/* Cross markers as red circles */}
-              <Line
-                yAxisId="left"
-                type="monotone"
-                dataKey="crossMarker"
-                stroke="none"
-                dot={{ fill: '#EF4444', r: 6, strokeWidth: 2, stroke: '#FFF' }}
-                name="Crosses"
-                isAnimationActive={false}
-              />
+          
+          {/* Account Balance Line */}
+          {balanceHistory && balanceHistory.length > 0 && (
+            <Line
+              yAxisId="left"
+              type="monotone"
+              dataKey="accountBalance"
+              stroke="#FBBF24"
+              strokeWidth={2}
+              dot={false}
+              name="Account Balance"
+              strokeDasharray="3 3"
+            />
+          )}
+          
+          {/* Cross markers as red circles */}
+          <Line
+            yAxisId="left"
+            type="monotone"
+            dataKey="crossMarker"
+            stroke="none"
+            dot={{ fill: '#EF4444', r: 6, strokeWidth: 2, stroke: '#FFF' }}
+            name="Crosses"
+            isAnimationActive={false}
+          />
+          
+          {/* Trade markers */}
+          {trades && trades.length > 0 && (
+            <Scatter
+              yAxisId="left"
+              dataKey="price"
+              fill="none"
+              shape={(props: unknown) => {
+                try {
+                  const { cx, cy, payload } = props as { cx: number; cy: number; payload: { tradeMarker?: string; tradeSymbol?: string; price?: number } };
+                  if (!payload?.tradeMarker) {
+                    return <circle cx={0} cy={0} r={0} fill="transparent" />;
+                  }
+                  
+                  const isSell = payload.tradeMarker === 'SELL_TO_OPEN';
+                  const color = isSell ? '#10B981' : '#EF4444'; // Green for sell, red for buy
+                  const symbol = isSell ? '▼' : '▲'; // Down arrow for sell, up for buy
+                  
+                  return (
+                    <g>
+                      <circle cx={cx} cy={cy} r={8} fill={color} stroke="#FFF" strokeWidth={2} />
+                      <text
+                        x={cx}
+                        y={cy + 4}
+                        textAnchor="middle"
+                        fill="#FFF"
+                        fontSize="12"
+                        fontWeight="bold"
+                      >
+                        {symbol}
+                      </text>
+                    </g>
+                  );
+                } catch (error) {
+                  console.error('Error rendering trade marker:', error);
+                  return <circle cx={0} cy={0} r={0} fill="transparent" />;
+                }
+              }}
+              name="Trades"
+            />
+          )}
               
               {/* Real option price markers */}
               {optionPrices && optionPrices.length > 0 && (

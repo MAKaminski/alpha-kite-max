@@ -15,6 +15,7 @@ import DataManagementDashboard from './DataManagementDashboard';
 import EquityChart from './EquityChart';
 import ESTClock from './ESTClock';
 import FeatureFlagsDashboard from './FeatureFlagsDashboard';
+import ManualOrderEntry from './ManualOrderEntry';
 import SignalsDashboard from './SignalsDashboard';
 import TradingDashboard from './TradingDashboard';
 
@@ -55,6 +56,29 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showFeatureFlags, setShowFeatureFlags] = useState(false);
+
+  // Portfolio tracking state
+  interface PortfolioData {
+    account_balance: number;
+    cash_balance: number;
+    total_pnl: number;
+    open_positions: number;
+    balance_history: Array<{
+      timestamp: string;
+      balance: number;
+      cash: number;
+      open_positions: number;
+    }>;
+    trades: Array<{
+      timestamp: string;
+      action: string;
+      option_symbol: string;
+      price: number;
+    }>;
+  }
+  
+  const [portfolioData, setPortfolioData] = useState<PortfolioData | null>(null);
+  const [currentPrice, setCurrentPrice] = useState(0);
   // Admin panel is now inline on Admin tab; keep state removed
 
   // Feature flags
@@ -319,6 +343,34 @@ export default function Dashboard() {
     return () => window.removeEventListener('openFeatureFlags', handleOpenFeatureFlags);
   }, []);
 
+  // Fetch portfolio data
+  useEffect(() => {
+    const fetchPortfolioData = async () => {
+      try {
+        const response = await fetch(`/api/portfolio?ticker=${ticker}`);
+        if (response.ok) {
+          const data = await response.json();
+          setPortfolioData(data);
+        }
+      } catch (error) {
+        console.error('Error fetching portfolio data:', error);
+      }
+    };
+
+    fetchPortfolioData();
+    // Refresh portfolio data every 5 seconds
+    const interval = setInterval(fetchPortfolioData, 5000);
+    return () => clearInterval(interval);
+  }, [ticker]);
+
+  // Update current price from display data
+  useEffect(() => {
+    if (displayData.length > 0) {
+      const latestPrice = displayData[displayData.length - 1].price;
+      setCurrentPrice(latestPrice);
+    }
+  }, [displayData]);
+
   // Fetch option prices when date changes (only if enabled)
   useEffect(() => {
     if (optionPricesEnabled) {
@@ -556,6 +608,8 @@ export default function Dashboard() {
               onToggleNonMarketHours={nonMarketHoursToggleEnabled ? setShowNonMarketHours : undefined}
               marketHoursHighlighting={marketHoursHighlightingEnabled}
               period={period}
+              trades={portfolioData?.trades || []}
+              balanceHistory={portfolioData?.balance_history || []}
             />
           )}
 
@@ -572,6 +626,29 @@ export default function Dashboard() {
         {!loading && !error && (
           <div className="mb-3">
             <DataManagementDashboard ticker={ticker} selectedDate={selectedDate} />
+          </div>
+        )}
+
+        {/* Manual Order Entry */}
+        {!loading && !error && (
+          <div className="mb-3">
+            <ManualOrderEntry
+              ticker={ticker}
+              currentPrice={currentPrice}
+              recentPriceAction={{
+                sma9: displayData.length > 0 ? displayData[displayData.length - 1].sma9 : 0,
+                vwap: displayData.length > 0 ? displayData[displayData.length - 1].vwap : 0,
+                trend: displayData.length > 0 && displayData[displayData.length - 1].sma9 > displayData[displayData.length - 1].vwap ? 'bullish' : 'bearish'
+              }}
+              hasOpenPosition={portfolioData ? portfolioData.open_positions > 0 : false}
+              onSubmit={() => {
+                // Refresh portfolio data after order submission
+                fetch(`/api/portfolio?ticker=${ticker}`)
+                  .then(res => res.json())
+                  .then(data => setPortfolioData(data))
+                  .catch(err => console.error('Error refreshing portfolio:', err));
+              }}
+            />
           </div>
         )}
 
