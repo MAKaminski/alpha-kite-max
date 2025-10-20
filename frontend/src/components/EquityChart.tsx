@@ -207,11 +207,21 @@ function EquityChart({
             style={{ fontSize: '12px' }}
           />
           <YAxis
+            yAxisId="left"
             tickFormatter={formatPrice}
             stroke="#6B7280"
             style={{ fontSize: '12px' }}
             domain={['auto', 'auto']}
-            label={{ value: 'Price (EST)', angle: -90, position: 'insideLeft', style: { fill: '#6B7280' } }}
+            label={{ value: 'Equity Price', angle: -90, position: 'insideLeft', style: { fill: '#6B7280' } }}
+          />
+          <YAxis
+            yAxisId="right"
+            orientation="right"
+            tickFormatter={(value) => `$${value.toFixed(2)}`}
+            stroke="#F59E0B"
+            style={{ fontSize: '12px' }}
+            domain={['auto', 'auto']}
+            label={{ value: 'Option Price', angle: 90, position: 'insideRight', style: { fill: '#F59E0B' } }}
           />
           <Tooltip
             contentStyle={{
@@ -228,6 +238,7 @@ function EquityChart({
             iconType="line"
           />
           <Line
+            yAxisId="left"
             type="monotone"
             dataKey="price"
             stroke="#3B82F6"
@@ -236,6 +247,7 @@ function EquityChart({
             name={`${ticker} Price`}
           />
           <Line
+            yAxisId="left"
             type="monotone"
             dataKey="sma9"
             stroke="#10B981"
@@ -245,6 +257,7 @@ function EquityChart({
             strokeDasharray="5 5"
           />
           <Line
+            yAxisId="left"
             type="monotone"
             dataKey="vwap"
             stroke="#A855F7"
@@ -255,6 +268,7 @@ function EquityChart({
           />
               {/* Cross markers as red circles */}
               <Line
+                yAxisId="left"
                 type="monotone"
                 dataKey="crossMarker"
                 stroke="none"
@@ -309,20 +323,29 @@ function EquityChart({
                 />
               )}
 
-              {/* Synthetic option price markers */}
+              {/* Synthetic option price markers - plotted on right axis */}
               {syntheticOptionPrices && syntheticOptionPrices.length > 0 && (
                 <Scatter
-                  dataKey="syntheticOptionPrice"
+                  yAxisId="right"
+                  data={syntheticOptionPrices.map(opt => ({
+                    timestamp: opt.timestamp,
+                    price: opt.market_price,  // Plot market price on right axis
+                    optionType: opt.option_type,
+                    marketPrice: opt.market_price,
+                    strikePrice: opt.strike_price,
+                    symbol: opt.option_symbol
+                  }))}
+                  dataKey="price"
                   fill="#F59E0B"
                   shape={(props: unknown) => {
                     try {
-                      const { cx, cy, payload } = props as { cx: number; cy: number; payload: { syntheticOptionPrice?: number; syntheticOptionType?: string } };
-                      if (!payload?.syntheticOptionPrice) {
+                      const { cx, cy, payload } = props as { cx: number; cy: number; payload: { price?: number; optionType?: string; strikePrice?: number } };
+                      if (!payload?.price || !payload?.optionType) {
                         return <circle cx={0} cy={0} r={0} fill="transparent" />;
                       }
                       
-                      const color = payload.syntheticOptionType === 'CALL' ? '#F59E0B' : '#EF4444';
-                      const symbol = payload.syntheticOptionType === 'CALL' ? 'C' : 'P';
+                      const color = payload.optionType === 'CALL' ? '#F59E0B' : '#EF4444';
+                      const symbol = payload.optionType === 'CALL' ? 'C' : 'P';
                       
                       return (
                         <g>
