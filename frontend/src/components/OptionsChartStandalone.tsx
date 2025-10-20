@@ -73,13 +73,13 @@ export default function OptionsChartStandalone() {
         bucket[minute][r.option_symbol].count += 1;
       }
       const rowsWide: ChartPoint[] = Object.entries(bucket).map(([ts, symbols]) => {
-        const row: ChartPoint = { timestamp: ts };
-        for (const sym of Object.keys(symbols)) {
+        const row: ChartPoint = { timestamp: ts } as ChartPoint;
+        Object.keys(symbols).forEach((sym) => {
           const agg = symbols[sym];
-          (row as any)[sym] = agg.sum / agg.count;
-        }
+          (row as Record<string, number | string>)[sym] = agg.sum / agg.count;
+        });
         return row;
-      }).sort((a,b)=>a.timestamp.localeCompare(b.timestamp));
+      }).sort((a,b)=> (a.timestamp as string).localeCompare(b.timestamp as string));
 
       setData(rowsWide);
     };
