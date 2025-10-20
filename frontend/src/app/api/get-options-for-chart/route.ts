@@ -14,9 +14,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Initialize Supabase client
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    // Initialize Supabase client (prefer server-side service role if available)
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
     if (!supabaseUrl || !supabaseKey) {
       console.error('Missing Supabase credentials');
@@ -84,13 +84,14 @@ export async function GET(request: NextRequest) {
       data_source: row.data_source || 'black_scholes_synthetic',
     }));
 
-    // TEMP DIAGNOSTIC: include supabase URL to verify live env wiring (will be removed)
+    // TEMP DIAGNOSTIC: include supabase URL source to verify live env wiring (will be removed)
     return NextResponse.json({
       data: optionsData,
       count: optionsData.length,
       date: date,
       ticker: ticker,
       diag_supabase_url: supabaseUrl,
+      diag_uses_service_role: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
     });
   } catch (error) {
     console.error('Error fetching options data:', error);
