@@ -11,6 +11,12 @@ interface DataFeedItem {
   volume: number;
   sma9?: number;
   vwap?: number;
+  options?: {
+    atm_call_price?: number;
+    atm_put_price?: number;
+    atm_call_strike?: number;
+    atm_put_strike?: number;
+  };
 }
 
 interface DataManagementDashboardProps {
@@ -201,13 +207,22 @@ function DataManagementDashboard({
 
     // Simulate live data updates every second (MOCK MODE)
     streamIntervalRef.current = setInterval(() => {
+      const basePrice = 600 + Math.random() * 10;
+      const atmStrike = Math.round(basePrice / 5) * 5; // Round to nearest $5
+      
       const newDataPoint: DataFeedItem = {
         timestamp: new Date().toISOString(),
         ticker: ticker,
-        price: 600 + Math.random() * 10,  // MOCK: Random price around 600
-        volume: Math.floor(Math.random() * 100000),  // MOCK: Random volume
-        sma9: 600 + Math.random() * 10,  // MOCK: Random SMA9
-        vwap: 600 + Math.random() * 10   // MOCK: Random VWAP
+        price: basePrice,
+        volume: Math.floor(Math.random() * 100000),
+        sma9: basePrice * (0.98 + Math.random() * 0.04), // SMA9 within 2% of price
+        vwap: basePrice * (0.99 + Math.random() * 0.02), // VWAP within 1% of price
+        options: (streamingType === 'options' || streamingType === 'both') ? {
+          atm_call_price: Math.max(0.1, (basePrice - atmStrike) * 0.1 + Math.random() * 2),
+          atm_put_price: Math.max(0.1, (atmStrike - basePrice) * 0.1 + Math.random() * 2),
+          atm_call_strike: atmStrike,
+          atm_put_strike: atmStrike
+        } : undefined
       };
 
       setDataFeed(prev => {
@@ -238,7 +253,13 @@ function DataManagementDashboard({
             price: data.price || 0,
             volume: data.volume || 0,
             sma9: data.sma9 || 0,
-            vwap: data.vwap || 0
+            vwap: data.vwap || 0,
+            options: (streamingType === 'options' || streamingType === 'both') && data.options ? {
+              atm_call_price: data.options.atm_call_price,
+              atm_put_price: data.options.atm_put_price,
+              atm_call_strike: data.options.atm_call_strike,
+              atm_put_strike: data.options.atm_put_strike
+            } : undefined
           };
 
           setDataFeed(prev => {
@@ -632,6 +653,12 @@ function DataManagementDashboard({
                     <div className="text-gray-500 text-[8px] flex justify-between">
                       <span>SMA: ${item.sma9.toFixed(2)}</span>
                       <span>VWAP: ${item.vwap.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {item.options && (
+                    <div className="text-green-400 text-[8px] flex justify-between">
+                      <span>C${item.options.atm_call_strike}: ${item.options.atm_call_price?.toFixed(2)}</span>
+                      <span>P${item.options.atm_put_strike}: ${item.options.atm_put_price?.toFixed(2)}</span>
                     </div>
                   )}
                 </div>

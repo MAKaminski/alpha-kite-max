@@ -19,24 +19,13 @@ export async function GET(request: NextRequest) {
 
     // For now, return mock portfolio data
     const mockPortfolio = {
-      account_balance: 105500.00,
+      account_balance: 100000.00,
       cash_balance: 100000.00,
       initial_balance: 100000.00,
-      total_pnl: 5500.00,
-      open_positions: 1,
-      total_exposure: 5500.00,
-      positions: [
-        {
-          ticker: ticker,
-          option_symbol: `${ticker}251020P00600000`,
-          option_type: 'PUT',
-          strike_price: 600.0,
-          contracts: 10,
-          entry_price: 5.50,
-          current_price: 4.50,
-          unrealized_pnl: 1000.00
-        }
-      ],
+      total_pnl: 0.00,
+      open_positions: 0,
+      total_exposure: 0.00,
+      positions: [],
       balance_history: [
         {
           timestamp: new Date(Date.now() - 3600000).toISOString(),
@@ -46,33 +35,14 @@ export async function GET(request: NextRequest) {
           trade_id: null
         },
         {
-          timestamp: new Date(Date.now() - 1800000).toISOString(),
-          balance: 105500.00,
-          cash: 105500.00,
-          open_positions: 1,
-          trade_id: `${ticker}251020P00600000`
-        },
-        {
           timestamp: new Date().toISOString(),
-          balance: 105500.00,
+          balance: 100000.00,
           cash: 100000.00,
-          open_positions: 1,
+          open_positions: 0,
           trade_id: null
         }
       ],
-      trades: [
-        {
-          timestamp: new Date(Date.now() - 1800000).toISOString(),
-          ticker: ticker,
-          option_symbol: `${ticker}251020P00600000`,
-          action: 'SELL_TO_OPEN',
-          option_type: 'PUT',
-          strike_price: 600.0,
-          contracts: 10,
-          price: 5.50,
-          credit_debit: 5500.00
-        }
-      ]
+      trades: []
     };
 
     return NextResponse.json(mockPortfolio);

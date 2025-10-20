@@ -26,30 +26,10 @@ export async function GET(request: NextRequest) {
       // Add options data if requested
       ...(type === 'options' || type === 'both' ? {
         options: {
-          calls: [
-            {
-              strike: 600,
-              price: 5.25 + (Math.random() - 0.5) * 0.5,
-              volume: Math.floor(Math.random() * 100)
-            },
-            {
-              strike: 605,
-              price: 3.75 + (Math.random() - 0.5) * 0.3,
-              volume: Math.floor(Math.random() * 80)
-            }
-          ],
-          puts: [
-            {
-              strike: 595,
-              price: 4.50 + (Math.random() - 0.5) * 0.4,
-              volume: Math.floor(Math.random() * 90)
-            },
-            {
-              strike: 590,
-              price: 2.25 + (Math.random() - 0.5) * 0.2,
-              volume: Math.floor(Math.random() * 70)
-            }
-          ]
+          atm_call_price: Math.max(0.1, (mockData.price - 600) * 0.1 + Math.random() * 2),
+          atm_put_price: Math.max(0.1, (600 - mockData.price) * 0.1 + Math.random() * 2),
+          atm_call_strike: 600,
+          atm_put_strike: 600
         }
       } : {})
     };
