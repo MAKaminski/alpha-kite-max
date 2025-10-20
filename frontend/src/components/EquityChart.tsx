@@ -172,20 +172,52 @@ function EquityChart({
     return baseData;
   }, [filteredData, crosses, optionPrices, realTimeOptionPrices, syntheticOptionPrices, ticker]);
 
-  // Build a dedicated options series independent of equity data
-  const optionsSeries = React.useMemo(() => {
-    if (!syntheticOptionPrices || syntheticOptionPrices.length === 0) return [] as Array<{ timestamp: string; syntheticOptionPrice: number }>;
-    try {
-      const series = syntheticOptionPrices.map(opt => ({
-        timestamp: opt.timestamp,
-        syntheticOptionPrice: opt.market_price,
-      }));
-      return series;
-    } catch (e) {
-      console.warn('Error building options series', e);
-      return [] as Array<{ timestamp: string; syntheticOptionPrice: number }>;
+  // Select up to 6 option symbols near the median strike and merge as additional series
+  const { mergedChartData, optionSeriesKeys } = React.useMemo(() => {
+    if (!syntheticOptionPrices || syntheticOptionPrices.length === 0) {
+      return { mergedChartData: chartData, optionSeriesKeys: [] as string[] };
     }
-  }, [syntheticOptionPrices]);
+    try {
+      // pick symbols around median strike
+      const strikes = syntheticOptionPrices.map(o => o.strike_price).sort((a,b)=>a-b);
+      const median = strikes[Math.floor(strikes.length/2)] || strikes[0];
+      const bySymbolStrike: Record<string, number> = {};
+      for (const r of syntheticOptionPrices) {
+        bySymbolStrike[r.option_symbol] = r.strike_price;
+      }
+      const selectedSymbols = Object.entries(bySymbolStrike)
+        .sort((a,b)=> Math.abs(a[1]-median) - Math.abs(b[1]-median))
+        .slice(0, 6)
+        .map(([sym]) => sym);
+
+      // bucket by minute and symbol
+      const bucket: Record<string, Record<string, { sum:number; count:number }>> = {};
+      for (const r of syntheticOptionPrices) {
+        if (!selectedSymbols.includes(r.option_symbol)) continue;
+        const minute = r.timestamp.slice(0,16)+':00';
+        bucket[minute] = bucket[minute] || {};
+        bucket[minute][r.option_symbol] = bucket[minute][r.option_symbol] || { sum:0, count:0 };
+        bucket[minute][r.option_symbol].sum += r.market_price;
+        bucket[minute][r.option_symbol].count += 1;
+      }
+
+      // merge into chartData by timestamp
+      const byTs = new Map<string, any>(chartData.map(row => [row.timestamp, { ...row }]));
+      for (const [ts, symbols] of Object.entries(bucket)) {
+        const row = byTs.get(ts) || { timestamp: ts } as any;
+        for (const sym of Object.keys(symbols)) {
+          const agg = symbols[sym];
+          row[sym] = agg.sum / agg.count;
+        }
+        byTs.set(ts, row);
+      }
+      const merged = Array.from(byTs.values()).sort((a,b)=> (a.timestamp as string).localeCompare(b.timestamp as string));
+      return { mergedChartData: merged, optionSeriesKeys: selectedSymbols };
+    } catch (e) {
+      console.warn('Error merging option series into chart', e);
+      return { mergedChartData: chartData, optionSeriesKeys: [] as string[] };
+    }
+  }, [chartData, syntheticOptionPrices]);
 
   // Get market hours segments for background shading
   const marketSegments = React.useMemo(() => {
@@ -240,7 +272,7 @@ function EquityChart({
       
       {/* Main Price Chart */}
       <ResponsiveContainer width="100%" height={400}>
-        <ComposedChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+        <ComposedChart data={mergedChartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.2} />
           
                 {/* Shade non-market hours with darker background (only if showing non-market hours and highlighting is enabled) */}
@@ -392,64 +424,21 @@ function EquityChart({
                 />
               )}
 
-              {/* Synthetic option price line - plotted on right axis */}
-              {syntheticOptionPrices && syntheticOptionPrices.length > 0 && (
+              {/* Synthetic option series (per option_symbol) on right axis */}
+              {optionSeriesKeys.map((key, idx) => (
                 <Line
+                  key={key}
                   yAxisId="right"
                   type="monotone"
-                  dataKey="syntheticOptionPrice"
-                  stroke="#F59E0B"
+                  dataKey={key}
+                  stroke={palette[idx % palette.length]}
                   strokeWidth={2}
-                  dot={{ fill: '#F59E0B', r: 3 }}
-                  name="Synthetic Option Prices"
+                  dot={false}
+                  name={key}
                 />
-              )}
+              ))}
             </ComposedChart>
       </ResponsiveContainer>
-
-
-      {/* Dedicated Options Chart (0DTE Synthetic) */}
-      {optionsSeries && optionsSeries.length > 0 && (
-        <div className="mt-3">
-          <div className="text-xs text-gray-400 mb-1">🧮 Synthetic 0DTE Options (Black-Scholes)</div>
-          <ResponsiveContainer width="100%" height={220}>
-            <ComposedChart data={optionsSeries} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.2} />
-              <XAxis
-                dataKey="timestamp"
-                tickFormatter={formatTime}
-                stroke="#6B7280"
-                style={{ fontSize: '12px' }}
-              />
-              <YAxis
-                tickFormatter={(v) => `$${v.toFixed(2)}`}
-                stroke="#F59E0B"
-                style={{ fontSize: '12px' }}
-                domain={["auto", "auto"]}
-                label={{ value: 'Option Price', angle: -90, position: 'insideLeft', style: { fill: '#F59E0B' } }}
-              />
-              <Tooltip
-                contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px', color: '#F9FAFB' }}
-                labelFormatter={(label) => `${formatToEST(label, 'h:mm:ss a')} EST`}
-                formatter={(value: number, name: string) => {
-                  if (name === 'syntheticOptionPrice') return [`$${value.toFixed(2)}`, 'Option Price'];
-                  return [`$${value.toFixed(2)}`, name];
-                }}
-              />
-              <Legend wrapperStyle={{ paddingTop: '8px' }} iconType="line" />
-              <Line
-                type="monotone"
-                dataKey="syntheticOptionPrice"
-                stroke="#F59E0B"
-                strokeWidth={2}
-                dot={{ r: 2, fill: '#F59E0B' }}
-                name="Synthetic Option Prices"
-                isAnimationActive={false}
-              />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </div>
-      )}
 
       {/* Volume Bar Chart */}
       <div className="mt-2">
