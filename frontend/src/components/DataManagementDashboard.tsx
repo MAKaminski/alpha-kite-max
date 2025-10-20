@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useRef, memo } from 'react';
 import { formatToEST } from '@/lib/timezone';
+import { memo, useEffect, useRef, useState } from 'react';
 import OptionsDownloadPanel from './OptionsDownloadPanel';
 
 interface DataFeedItem {
