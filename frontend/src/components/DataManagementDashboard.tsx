@@ -44,8 +44,23 @@ function DataManagementDashboard({
   // Auto-Backfill Controls State
   const [isBackfilling, setIsBackfilling] = useState(false);
   const [backfillStatus, setBackfillStatus] = useState<string>('Ready');
-  const [backfillResults, setBackfillResults] = useState<Record<string, unknown> | null>(null);
-  const [dataRangeStatus, setDataRangeStatus] = useState<Record<string, unknown> | null>(null);
+  interface BackfillResults {
+    backfilled_data?: {
+      equity?: { records_added: number };
+      options?: { records_added: number };
+    };
+  }
+  
+  interface DataRangeStatus {
+    data_ranges?: {
+      equity?: { total_records: number };
+      options?: { total_records: number };
+    };
+    last_backfill?: string;
+  }
+  
+  const [backfillResults, setBackfillResults] = useState<BackfillResults | null>(null);
+  const [dataRangeStatus, setDataRangeStatus] = useState<DataRangeStatus | null>(null);
 
   // Set default date to today and start streaming
   useEffect(() => {
@@ -59,7 +74,6 @@ function DataManagementDashboard({
     
     // Don't auto-start streaming for safety
     // startDataFeed();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Auto-scroll data feed to bottom when new data arrives
@@ -140,7 +154,7 @@ function DataManagementDashboard({
         });
 
         if (response.ok) {
-          const data = await response.json();
+          await response.json(); // Consume response
           if (streamingMode === 'mock') {
             setStreamingStatus('🟡 Live (MOCK)');
             startDataFeed();

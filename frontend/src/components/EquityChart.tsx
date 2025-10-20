@@ -76,8 +76,8 @@ function EquityChart({
   syntheticOptionPrices = [],
   showNonMarketHours = false,
   onToggleNonMarketHours,
-  showSyntheticOptions = true,
-  onToggleSyntheticOptions,
+  showSyntheticOptions: _showSyntheticOptions = true,
+  onToggleSyntheticOptions: _onToggleSyntheticOptions,
   marketHoursHighlighting = true,
   period = 'minute',
   trades = [],
@@ -135,19 +135,8 @@ function EquityChart({
         });
   }, [data, showNonMarketHours]);
 
-  // Filter synthetic options to only show during market hours
-  const filteredSyntheticOptions = React.useMemo(() => {
-    if (!syntheticOptionPrices || syntheticOptionPrices.length === 0) return [];
-    
-    return syntheticOptionPrices.filter(option => {
-      try {
-        return isRegularTradingHours(option.timestamp);
-      } catch (error) {
-        console.warn('Error checking market hours for option:', error);
-        return false; // Default to hiding the option
-      }
-    });
-  }, [syntheticOptionPrices]);
+  // Note: Synthetic options are now filtered during chart data merge
+  // This ensures they only appear during market hours
 
   // Prepare chart data with option prices
   const chartData = React.useMemo(() => {

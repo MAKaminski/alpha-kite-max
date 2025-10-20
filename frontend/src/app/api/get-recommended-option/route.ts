@@ -40,34 +40,49 @@ export async function POST(request: NextRequest) {
     let strikePrice = current_price;
     let rationale = '';
 
+    // Helper function to round to nearest strike (nearest dollar or nearest $5 increment for higher prices)
+    const roundToNearestStrike = (price: number): number => {
+      if (price < 100) {
+        // For prices under $100, strikes are typically in $1 increments
+        return Math.round(price);
+      } else if (price < 500) {
+        // For prices $100-$500, strikes are typically in $5 increments
+        return Math.round(price / 5) * 5;
+      } else {
+        // For prices over $500, strikes are typically in $5 or $10 increments
+        return Math.round(price / 5) * 5;
+      }
+    };
+
     if (action === 'SELL_TO_OPEN') {
       // Choose option type based on trend
       if (price_action?.trend === 'bullish') {
         // Bullish: sell OTM puts (expect price to stay above strike)
         optionType = 'PUT';
-        strikePrice = Math.floor(current_price * 0.99); // 1% OTM
-        rationale = `Bullish trend detected (SMA9: ${price_action.sma9?.toFixed(2)}). Selling OTM PUT at ${strikePrice} with expectation price stays above strike.`;
+        // For bullish, sell slightly OTM put (1-2% below current price)
+        const otmPrice = current_price * 0.985; // 1.5% OTM
+        strikePrice = roundToNearestStrike(otmPrice);
+        rationale = `Bullish trend detected (SMA9: ${price_action.sma9?.toFixed(2)}). Selling OTM PUT at $${strikePrice} (nearest strike to ${otmPrice.toFixed(2)}) with expectation price stays above strike.`;
       } else if (price_action?.trend === 'bearish') {
         // Bearish: sell OTM calls (expect price to stay below strike)
         optionType = 'CALL';
-        strikePrice = Math.ceil(current_price * 1.01); // 1% OTM
-        rationale = `Bearish trend detected (SMA9: ${price_action.sma9?.toFixed(2)}). Selling OTM CALL at ${strikePrice} with expectation price stays below strike.`;
+        // For bearish, sell slightly OTM call (1-2% above current price)
+        const otmPrice = current_price * 1.015; // 1.5% OTM
+        strikePrice = roundToNearestStrike(otmPrice);
+        rationale = `Bearish trend detected (SMA9: ${price_action.sma9?.toFixed(2)}). Selling OTM CALL at $${strikePrice} (nearest strike to ${otmPrice.toFixed(2)}) with expectation price stays below strike.`;
       } else {
         // Neutral: sell ATM put (higher premium)
         optionType = 'PUT';
-        strikePrice = Math.round(current_price);
-        rationale = `Neutral trend. Selling ATM PUT at ${strikePrice} for premium collection.`;
+        strikePrice = roundToNearestStrike(current_price);
+        rationale = `Neutral trend. Selling ATM PUT at $${strikePrice} (nearest strike to ${current_price.toFixed(2)}) for premium collection.`;
       }
     } else {
-      // BUY_TO_CLOSE: match the existing position type
+      // BUY_TO_CLOSE: use nearest strike to current price
       // For now, assume we're closing a PUT position
       optionType = 'PUT';
-      strikePrice = Math.round(current_price);
-      rationale = `Closing existing position at current market price.`;
+      strikePrice = roundToNearestStrike(current_price);
+      rationale = `Closing existing position at nearest strike $${strikePrice} to current market price $${current_price.toFixed(2)}.`;
     }
-
-    // Round strike to nearest dollar
-    strikePrice = Math.round(strikePrice);
 
     // Generate option symbol
     const optionSymbol = `${ticker}${dateStr}${optionType.charAt(0)}${strikePrice.toString().padStart(8, '0')}`;
