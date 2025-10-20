@@ -101,13 +101,13 @@ function EquityChart({
   }, [data, showNonMarketHours]);
 
   // Prepare chart data with option prices
+  // Note: Synthetic options are plotted separately via Scatter component (not merged into equity data)
   const chartData = React.useMemo(() => {
     return filteredData.map(point => {
       try {
         const cross = (crosses || []).find(c => c.timestamp === point.timestamp);
         const optionPrice = (optionPrices || []).find(op => op.timestamp === point.timestamp);
         const realTimeOption = (realTimeOptionPrices || []).find(rt => rt.timestamp === point.timestamp);
-        const syntheticOption = (syntheticOptionPrices || []).find(so => so.timestamp === point.timestamp);
         
         return {
           ...point,
@@ -117,10 +117,7 @@ function EquityChart({
           optionType: realTimeOption ? 'PUT' : 
                      optionPrice ? optionPrice.option_type : null,
           optionSymbol: realTimeOption ? `${ticker}_PUT_${realTimeOption.put_strike}` : 
-                       optionPrice ? optionPrice.option_symbol : null,
-          syntheticOptionPrice: syntheticOption ? syntheticOption.market_price : null,
-          syntheticOptionType: syntheticOption ? syntheticOption.option_type : null,
-          syntheticOptionSymbol: syntheticOption ? syntheticOption.option_symbol : null
+                       optionPrice ? optionPrice.option_symbol : null
         };
       } catch (error) {
         console.warn('Error processing chart point:', error);
@@ -129,14 +126,11 @@ function EquityChart({
           crossMarker: null,
           optionPrice: null,
           optionType: null,
-          optionSymbol: null,
-          syntheticOptionPrice: null,
-          syntheticOptionType: null,
-          syntheticOptionSymbol: null
+          optionSymbol: null
         };
       }
     });
-  }, [filteredData, crosses, optionPrices, realTimeOptionPrices, syntheticOptionPrices, ticker]);
+  }, [filteredData, crosses, optionPrices, realTimeOptionPrices, ticker]);
 
   // Get market hours segments for background shading
   const marketSegments = React.useMemo(() => {
@@ -332,6 +326,7 @@ function EquityChart({
               {/* Synthetic option price markers - plotted on right axis */}
               {syntheticOptionPrices && syntheticOptionPrices.length > 0 && (
                 <Scatter
+                  xAxisId={0}
                   yAxisId="right"
                   data={syntheticOptionPrices.map(opt => ({
                     timestamp: opt.timestamp,

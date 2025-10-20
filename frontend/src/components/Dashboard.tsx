@@ -22,7 +22,8 @@ export default function Dashboard() {
   const [ticker, setTicker] = useState('QQQ');
   const [allData, setAllData] = useState<ChartDataPoint[]>([]);
   const [displayData, setDisplayData] = useState<ChartDataPoint[]>([]);
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  // Default to Oct 17, 2025 - the last date with equity data
+  const [selectedDate, setSelectedDate] = useState(new Date('2025-10-17'));
   const [todayCrosses, setTodayCrosses] = useState<Cross[]>([]);
   const [optionPrices, setOptionPrices] = useState<TradeOptionPrice[]>([]);
   const [realTimeOptionPrices, setRealTimeOptionPrices] = useState<RealTimeOptionPrice[]>([]);
