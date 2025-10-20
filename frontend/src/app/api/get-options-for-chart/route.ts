@@ -46,7 +46,23 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform data for chart display
-    const optionsData = (data || []).map((row: any) => ({
+    interface SupabaseOptionRow {
+      timestamp: string;
+      ticker: string;
+      option_symbol: string;
+      option_type: string;
+      strike_price: string;
+      market_price: string;
+      spot_price: string;
+      delta: string;
+      gamma: string;
+      theta: string;
+      vega: string;
+      implied_volatility: string;
+      data_source?: string;
+    }
+    
+    const optionsData = (data || []).map((row: SupabaseOptionRow) => ({
       timestamp: row.timestamp,
       ticker: row.ticker,
       option_symbol: row.option_symbol,
