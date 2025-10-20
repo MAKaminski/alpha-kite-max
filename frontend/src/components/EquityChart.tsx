@@ -109,9 +109,8 @@ function EquityChart({
   }, [data, showNonMarketHours]);
 
   // Prepare chart data with option prices
-  // Note: Synthetic options are plotted separately via Scatter component (not merged into equity data)
   const chartData = React.useMemo(() => {
-    return filteredData.map(point => {
+    const baseData = filteredData.map(point => {
       try {
         const cross = (crosses || []).find(c => c.timestamp === point.timestamp);
         const optionPrice = (optionPrices || []).find(op => op.timestamp === point.timestamp);
@@ -138,7 +137,32 @@ function EquityChart({
         };
       }
     });
-  }, [filteredData, crosses, optionPrices, realTimeOptionPrices, ticker]);
+
+    // Add synthetic options as separate data points
+    if (syntheticOptionPrices && syntheticOptionPrices.length > 0) {
+      console.log('🎯 Adding synthetic options to chart data:', syntheticOptionPrices.length);
+      const syntheticData = syntheticOptionPrices.map(opt => ({
+        timestamp: opt.timestamp,
+        price: null, // No equity price for synthetic options
+        volume: null,
+        sma9: null,
+        vwap: null,
+        crossMarker: null,
+        optionPrice: null,
+        optionType: null,
+        optionSymbol: null,
+        // Synthetic option data
+        syntheticOptionPrice: opt.market_price,
+        syntheticOptionType: opt.option_type,
+        syntheticOptionSymbol: opt.option_symbol,
+        syntheticStrikePrice: opt.strike_price
+      }));
+      
+      return [...baseData, ...syntheticData];
+    }
+
+    return baseData;
+  }, [filteredData, crosses, optionPrices, realTimeOptionPrices, syntheticOptionPrices, ticker]);
 
   // Get market hours segments for background shading
   const marketSegments = React.useMemo(() => {
@@ -335,15 +359,7 @@ function EquityChart({
               {syntheticOptionPrices && syntheticOptionPrices.length > 0 && (
                 <Scatter
                   yAxisId="right"
-                  data={syntheticOptionPrices.map(opt => ({
-                    timestamp: opt.timestamp,
-                    price: opt.market_price,  // Plot market price on right axis
-                    optionType: opt.option_type,
-                    marketPrice: opt.market_price,
-                    strikePrice: opt.strike_price,
-                    symbol: opt.option_symbol
-                  }))}
-                  dataKey="price"
+                  dataKey="syntheticOptionPrice"
                   fill="#F59E0B"
                   name="Synthetic Option Prices"
                 />

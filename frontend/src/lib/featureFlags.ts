@@ -264,10 +264,12 @@ class FeatureFlagsService {
 
   private loadFromStorage() {
     try {
-      const stored = localStorage.getItem(this.storageKey);
-      if (stored) {
-        const parsed = JSON.parse(stored) as FeatureFlagState;
-        this.flags = parsed.flags || {};
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const stored = localStorage.getItem(this.storageKey);
+        if (stored) {
+          const parsed = JSON.parse(stored) as FeatureFlagState;
+          this.flags = parsed.flags || {};
+        }
       }
     } catch (error) {
       console.warn('Failed to load feature flags from storage:', error);
@@ -276,11 +278,13 @@ class FeatureFlagsService {
 
   private saveToStorage() {
     try {
-      const state: FeatureFlagState = {
-        flags: this.flags,
-        lastUpdated: new Date().toISOString()
-      };
-      localStorage.setItem(this.storageKey, JSON.stringify(state));
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const state: FeatureFlagState = {
+          flags: this.flags,
+          lastUpdated: new Date().toISOString()
+        };
+        localStorage.setItem(this.storageKey, JSON.stringify(state));
+      }
     } catch (error) {
       console.warn('Failed to save feature flags to storage:', error);
     }
