@@ -204,8 +204,9 @@ function EquityChart({
 
   // Select up to 6 option symbols near the median strike and merge as additional series
   const { mergedChartData, optionSeriesKeys } = React.useMemo(() => {
-    // Use any[] for intermediate processing to avoid type conflicts
-    let baseChartData: any[] = chartData;
+    type ChartRow = Record<string, string | number | null>;
+    // Use Record type for intermediate processing to avoid type conflicts
+    let baseChartData: ChartRow[] = chartData as ChartRow[];
     let selectedSymbols: string[] = [];
 
     // Merge synthetic options if available
@@ -235,16 +236,16 @@ function EquityChart({
         }
 
         // merge into chartData by timestamp
-        const byTs = new Map<string, any>(chartData.map(row => [row.timestamp, { ...row }]));
+        const byTs = new Map<string, ChartRow>(chartData.map(row => [row.timestamp, { ...row } as ChartRow]));
         for (const [ts, symbols] of Object.entries(bucket)) {
-          const row = byTs.get(ts) || { timestamp: ts };
+          const row = byTs.get(ts) || ({ timestamp: ts } as ChartRow);
           for (const sym of Object.keys(symbols)) {
             const agg = symbols[sym];
             row[sym] = agg.sum / agg.count;
           }
           byTs.set(ts, row);
         }
-        baseChartData = Array.from(byTs.values()).sort((a,b)=> a.timestamp.localeCompare(b.timestamp));
+        baseChartData = Array.from(byTs.values()).sort((a,b)=> String(a.timestamp).localeCompare(String(b.timestamp)));
       } catch (e) {
         console.warn('Error merging option series into chart', e);
       }
@@ -252,7 +253,7 @@ function EquityChart({
 
     // Merge balance history if available
     if (balanceHistory && balanceHistory.length > 0) {
-      const byTs = new Map<string, any>(baseChartData.map(row => [row.timestamp, { ...row }]));
+      const byTs = new Map<string, ChartRow>(baseChartData.map(row => [String(row.timestamp), { ...row }]));
       
       for (const balancePoint of balanceHistory) {
         // Find closest timestamp in chart data (within 1 minute)
@@ -261,11 +262,11 @@ function EquityChart({
         let minDiff = Infinity;
         
         for (const row of baseChartData) {
-          const rowTime = new Date(row.timestamp).getTime();
+          const rowTime = new Date(String(row.timestamp)).getTime();
           const diff = Math.abs(rowTime - balanceTime);
           if (diff < minDiff && diff < 60000) { // within 1 minute
             minDiff = diff;
-            closestTs = row.timestamp;
+            closestTs = String(row.timestamp);
           }
         }
         
@@ -278,12 +279,12 @@ function EquityChart({
         }
       }
       
-      baseChartData = Array.from(byTs.values()).sort((a,b)=> a.timestamp.localeCompare(b.timestamp));
+      baseChartData = Array.from(byTs.values()).sort((a,b)=> String(a.timestamp).localeCompare(String(b.timestamp)));
     }
 
     // Add trade markers
     if (trades && trades.length > 0) {
-      const byTs = new Map<string, any>(baseChartData.map(row => [row.timestamp, { ...row }]));
+      const byTs = new Map<string, ChartRow>(baseChartData.map(row => [String(row.timestamp), { ...row }]));
       
       for (const trade of trades) {
         // Find closest timestamp in chart data
@@ -292,11 +293,11 @@ function EquityChart({
         let minDiff = Infinity;
         
         for (const row of baseChartData) {
-          const rowTime = new Date(row.timestamp).getTime();
+          const rowTime = new Date(String(row.timestamp)).getTime();
           const diff = Math.abs(rowTime - tradeTime);
           if (diff < minDiff && diff < 60000) { // within 1 minute
             minDiff = diff;
-            closestTs = row.timestamp;
+            closestTs = String(row.timestamp);
           }
         }
         
@@ -309,7 +310,7 @@ function EquityChart({
         }
       }
       
-      baseChartData = Array.from(byTs.values()).sort((a,b)=> a.timestamp.localeCompare(b.timestamp));
+      baseChartData = Array.from(byTs.values()).sort((a,b)=> String(a.timestamp).localeCompare(String(b.timestamp)));
     }
 
     return { mergedChartData: baseChartData, optionSeriesKeys: selectedSymbols };
