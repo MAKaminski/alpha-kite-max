@@ -26,6 +26,7 @@ export default function Dashboard() {
   const [todayCrosses, setTodayCrosses] = useState<Cross[]>([]);
   const [optionPrices, setOptionPrices] = useState<TradeOptionPrice[]>([]);
   const [realTimeOptionPrices, setRealTimeOptionPrices] = useState<RealTimeOptionPrice[]>([]);
+  const [syntheticOptionPrices, setSyntheticOptionPrices] = useState<any[]>([]);
   const [showNonMarketHours, setShowNonMarketHours] = useState(false);
   const [period, setPeriod] = useState<'minute' | 'hour'>('minute');
   const [loading, setLoading] = useState(true);
@@ -251,6 +252,25 @@ export default function Dashboard() {
     }
   };
 
+  const fetchSyntheticOptionPrices = async () => {
+    try {
+      const dateStr = selectedDate.toISOString().split('T')[0];
+      const response = await fetch(`/api/get-options-for-chart?ticker=${ticker}&date=${dateStr}`);
+      
+      if (!response.ok) {
+        console.error('Failed to fetch synthetic options:', response.statusText);
+        setSyntheticOptionPrices([]);
+        return;
+      }
+      
+      const result = await response.json();
+      setSyntheticOptionPrices(result.data || []);
+    } catch (error) {
+      console.error('Error fetching synthetic option prices:', error);
+      setSyntheticOptionPrices([]);
+    }
+  };
+
   // Fetch data when ticker or period changes
   useEffect(() => {
     fetchData();
@@ -271,6 +291,8 @@ export default function Dashboard() {
     if (realTimeOptionsEnabled) {
       fetchRealTimeOptionPrices();
     }
+    // Always fetch synthetic options (for 0DTE chart display)
+    fetchSyntheticOptionPrices();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate, ticker, optionPricesEnabled, realTimeOptionsEnabled]);
 
@@ -493,6 +515,7 @@ export default function Dashboard() {
               crosses={crossDetectionEnabled ? todayCrosses : []}
               optionPrices={optionPricesEnabled ? optionPrices : []}
               realTimeOptionPrices={realTimeOptionsEnabled ? realTimeOptionPrices : []}
+              syntheticOptionPrices={syntheticOptionPrices}
               showNonMarketHours={showNonMarketHours}
               onToggleNonMarketHours={nonMarketHoursToggleEnabled ? setShowNonMarketHours : undefined}
               marketHoursHighlighting={marketHoursHighlightingEnabled}
