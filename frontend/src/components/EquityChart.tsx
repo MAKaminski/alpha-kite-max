@@ -172,6 +172,21 @@ function EquityChart({
     return baseData;
   }, [filteredData, crosses, optionPrices, realTimeOptionPrices, syntheticOptionPrices, ticker]);
 
+  // Build a dedicated options series independent of equity data
+  const optionsSeries = React.useMemo(() => {
+    if (!syntheticOptionPrices || syntheticOptionPrices.length === 0) return [] as Array<{ timestamp: string; syntheticOptionPrice: number }>;
+    try {
+      const series = syntheticOptionPrices.map(opt => ({
+        timestamp: opt.timestamp,
+        syntheticOptionPrice: opt.market_price,
+      }));
+      return series;
+    } catch (e) {
+      console.warn('Error building options series', e);
+      return [] as Array<{ timestamp: string; syntheticOptionPrice: number }>;
+    }
+  }, [syntheticOptionPrices]);
+
   // Get market hours segments for background shading
   const marketSegments = React.useMemo(() => {
     try {
@@ -394,11 +409,11 @@ function EquityChart({
 
 
       {/* Dedicated Options Chart (0DTE Synthetic) */}
-      {syntheticOptionPrices && syntheticOptionPrices.length > 0 && (
+      {optionsSeries && optionsSeries.length > 0 && (
         <div className="mt-3">
           <div className="text-xs text-gray-400 mb-1">🧮 Synthetic 0DTE Options (Black-Scholes)</div>
           <ResponsiveContainer width="100%" height={220}>
-            <ComposedChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+            <ComposedChart data={optionsSeries} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.2} />
               <XAxis
                 dataKey="timestamp"
