@@ -277,6 +277,7 @@ export default function Dashboard() {
   const fetchSyntheticOptionPrices = async () => {
     try {
       const dateStr = selectedDate.toISOString().split('T')[0];
+      console.log('🔍 Fetching synthetic options for:', ticker, 'date:', dateStr);
       const response = await fetch(`/api/get-options-for-chart?ticker=${ticker}&date=${dateStr}`);
       
       if (!response.ok) {
@@ -286,6 +287,10 @@ export default function Dashboard() {
       }
       
       const result = await response.json();
+      console.log('✅ Fetched synthetic options:', result.count, 'options');
+      if (result.data && result.data.length > 0) {
+        console.log('   First option:', result.data[0]);
+      }
       setSyntheticOptionPrices(result.data || []);
     } catch (error) {
       console.error('Error fetching synthetic option prices:', error);

@@ -56,6 +56,12 @@ function EquityChart({
   marketHoursHighlighting = true,
   period = 'minute'
 }: EquityChartProps) {
+  // Debug logging
+  console.log('📊 EquityChart render - syntheticOptionPrices count:', syntheticOptionPrices?.length || 0);
+  if (syntheticOptionPrices && syntheticOptionPrices.length > 0) {
+    console.log('   First synthetic option:', syntheticOptionPrices[0]);
+  }
+
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp);
     const estDate = new Date(date.toLocaleString('en-US', { timeZone: 'America/New_York' }));
