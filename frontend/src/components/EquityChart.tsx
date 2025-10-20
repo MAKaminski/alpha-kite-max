@@ -60,6 +60,14 @@ function EquityChart({
   console.log('📊 EquityChart render - syntheticOptionPrices count:', syntheticOptionPrices?.length || 0);
   if (syntheticOptionPrices && syntheticOptionPrices.length > 0) {
     console.log('   First synthetic option:', syntheticOptionPrices[0]);
+    console.log('   Sample options for chart:', syntheticOptionPrices.slice(0, 3).map(opt => ({
+      timestamp: opt.timestamp,
+      market_price: opt.market_price,
+      option_type: opt.option_type,
+      strike_price: opt.strike_price
+    })));
+  } else {
+    console.log('❌ No synthetic options data received by chart component');
   }
 
   const formatTime = (timestamp: string) => {
@@ -328,14 +336,19 @@ function EquityChart({
                 <Scatter
                   xAxisId={0}
                   yAxisId="right"
-                  data={syntheticOptionPrices.map(opt => ({
-                    timestamp: opt.timestamp,
-                    price: opt.market_price,  // Plot market price on right axis
-                    optionType: opt.option_type,
-                    marketPrice: opt.market_price,
-                    strikePrice: opt.strike_price,
-                    symbol: opt.option_symbol
-                  }))}
+                  data={(() => {
+                    const scatterData = syntheticOptionPrices.map(opt => ({
+                      timestamp: opt.timestamp,
+                      price: opt.market_price,  // Plot market price on right axis
+                      optionType: opt.option_type,
+                      marketPrice: opt.market_price,
+                      strikePrice: opt.strike_price,
+                      symbol: opt.option_symbol
+                    }));
+                    console.log('🎯 Scatter data prepared:', scatterData.length, 'points');
+                    console.log('   Sample scatter points:', scatterData.slice(0, 3));
+                    return scatterData;
+                  })()}
                   dataKey="price"
                   fill="#F59E0B"
                   shape={(props: unknown) => {
