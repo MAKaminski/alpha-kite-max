@@ -38,7 +38,7 @@ class SyntheticOptionsGenerator:
         self,
         date: datetime,
         ticker: str = "QQQ",
-        base_price: float = 600.0,
+        base_price: Optional[float] = None,
         strike_range: float = 50.0,
         strike_increment: float = 5.0,
         time_intervals: int = 60
@@ -57,14 +57,24 @@ class SyntheticOptionsGenerator:
         Returns:
             DataFrame with synthetic options data
         """
+        # If no base price provided, fetch actual equity data for the date
+        if base_price is None:
+            base_price = self._get_actual_base_price(date, ticker)
+            logger.info("using_actual_base_price", base_price=base_price)
+        
         # Generate strike prices
         strikes = self._generate_strike_prices(base_price, strike_range, strike_increment)
         
         # Generate time intervals throughout the trading day
         time_points = self._generate_time_intervals(date, time_intervals)
         
-        # Generate price movements (random walk)
-        price_movements = self._generate_price_movements(base_price, len(time_points))
+        # Try to get actual price movements first, fallback to random walk
+        price_movements = self._get_actual_price_movements(date, ticker, time_points)
+        if price_movements is None:
+            price_movements = self._generate_price_movements(base_price, len(time_points))
+            logger.info("using_synthetic_price_movements")
+        else:
+            logger.info("using_actual_price_movements", count=len(price_movements))
         
         all_data = []
         
@@ -322,6 +332,70 @@ class SyntheticOptionsGenerator:
             volatility *= 1.2
         
         return volatility
+    
+    def _get_actual_base_price(self, date: datetime, ticker: str) -> float:
+        """Get the actual base price from equity data for the given date."""
+        try:
+            date_str = date.strftime('%Y-%m-%d')
+            result = self.supabase_client.client.table('equity_data').select('price').eq('ticker', ticker).gte('timestamp', f'{date_str}T00:00:00').lte('timestamp', f'{date_str}T23:59:59').order('timestamp', desc=False).limit(1).execute()
+            
+            if result.data and len(result.data) > 0:
+                return float(result.data[0]['price'])
+            else:
+                logger.warning("no_equity_data_found", date=date_str, ticker=ticker)
+                return 600.0  # Fallback to default
+        except Exception as e:
+            logger.error("error_fetching_base_price", error=str(e))
+            return 600.0  # Fallback to default
+    
+    def _get_actual_price_movements(self, date: datetime, ticker: str, time_points: List[datetime]) -> Optional[List[float]]:
+        """Get actual price movements from equity data for the given date and time points."""
+        try:
+            date_str = date.strftime('%Y-%m-%d')
+            result = self.supabase_client.client.table('equity_data').select('timestamp, price').eq('ticker', ticker).gte('timestamp', f'{date_str}T00:00:00').lte('timestamp', f'{date_str}T23:59:59').order('timestamp', desc=False).execute()
+            
+            if not result.data or len(result.data) < 2:
+                logger.warning("insufficient_equity_data", date=date_str, ticker=ticker, count=len(result.data) if result.data else 0)
+                return None
+            
+            # Create a mapping of timestamp to price
+            equity_data = {row['timestamp']: float(row['price']) for row in result.data}
+            
+            # Map time points to actual prices (interpolate if needed)
+            actual_prices = []
+            for time_point in time_points:
+                time_str = time_point.strftime('%Y-%m-%dT%H:%M:%S')
+                
+                # Try exact match first
+                if time_str in equity_data:
+                    actual_prices.append(equity_data[time_str])
+                else:
+                    # Find closest timestamp
+                    closest_time = None
+                    min_diff = float('inf')
+                    
+                    for equity_time in equity_data.keys():
+                        equity_dt = datetime.fromisoformat(equity_time.replace('Z', '+00:00'))
+                        # Ensure both datetimes are timezone-aware
+                        if time_point.tzinfo is None:
+                            time_point = time_point.replace(tzinfo=equity_dt.tzinfo)
+                        diff = abs((time_point - equity_dt).total_seconds())
+                        if diff < min_diff:
+                            min_diff = diff
+                            closest_time = equity_time
+                    
+                    if closest_time and min_diff < 300:  # Within 5 minutes
+                        actual_prices.append(equity_data[closest_time])
+                    else:
+                        # If no close match, use the first available price
+                        actual_prices.append(list(equity_data.values())[0])
+            
+            logger.info("mapped_actual_prices", count=len(actual_prices), time_points=len(time_points))
+            return actual_prices
+            
+        except Exception as e:
+            logger.error("error_fetching_price_movements", error=str(e))
+            return None
     
     def _create_option_symbol(self, ticker: str, expiry_date: datetime, strike: float, option_type: str) -> str:
         """Create option symbol in standard format."""
