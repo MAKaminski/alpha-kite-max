@@ -76,8 +76,8 @@ function EquityChart({
   syntheticOptionPrices = [],
   showNonMarketHours = false,
   onToggleNonMarketHours,
-  showSyntheticOptions = true,
-  onToggleSyntheticOptions,
+  showSyntheticOptions = true, // eslint-disable-line @typescript-eslint/no-unused-vars
+  onToggleSyntheticOptions, // eslint-disable-line @typescript-eslint/no-unused-vars
   marketHoursHighlighting = true,
   period = 'minute',
   trades = [],
@@ -419,8 +419,12 @@ function EquityChart({
               color: '#F9FAFB',
             }}
             labelFormatter={(label) => `${formatToEST(label, 'h:mm:ss a')} EST`}
-            formatter={(value: number | string | null | undefined, name: string) => {
-              const numValue = typeof value === 'number' ? value : parseFloat(String(value || 0));
+            formatter={(value: any, name: string) => {
+              // Safely handle any value type from Recharts
+              const numValue = typeof value === 'number' ? value : 
+                              Array.isArray(value) ? value[0] : 
+                              parseFloat(String(value || 0));
+              
               if (name === 'syntheticOptionPrice') {
                 return [formatPrice(numValue), 'Option Price'];
               }
