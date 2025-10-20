@@ -41,6 +41,12 @@ function DataManagementDashboard({
   const [streamingMode, setStreamingMode] = useState<'mock' | 'real'>('mock'); // Track streaming mode
   const [streamingType, setStreamingType] = useState<'equity' | 'options' | 'both'>('both'); // Track what to stream
 
+  // Auto-Backfill Controls State
+  const [isBackfilling, setIsBackfilling] = useState(false);
+  const [backfillStatus, setBackfillStatus] = useState<string>('Ready');
+  const [backfillResults, setBackfillResults] = useState<any>(null);
+  const [dataRangeStatus, setDataRangeStatus] = useState<any>(null);
+
   // Set default date to today and start streaming
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
@@ -239,6 +245,58 @@ function DataManagementDashboard({
       streamIntervalRef.current = null;
     }
   };
+
+  // Auto-Backfill Functions
+  const handleAutoBackfill = async () => {
+    setIsBackfilling(true);
+    setBackfillStatus('Starting auto-backfill...');
+
+    try {
+      const response = await fetch('/api/auto-backfill', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ticker,
+          data_types: ['equity', 'options'],
+          force: false
+        })
+      });
+
+      if (response.ok) {
+        const results = await response.json();
+        setBackfillResults(results);
+        setBackfillStatus('✅ Auto-backfill completed');
+        
+        // Refresh data range status
+        await fetchDataRangeStatus();
+      } else {
+        const error = await response.json();
+        setBackfillStatus(`❌ Error: ${error.error}`);
+      }
+    } catch (error) {
+      console.error('Auto-backfill error:', error);
+      setBackfillStatus('❌ Auto-backfill failed');
+    } finally {
+      setIsBackfilling(false);
+    }
+  };
+
+  const fetchDataRangeStatus = async () => {
+    try {
+      const response = await fetch(`/api/auto-backfill?ticker=${ticker}`);
+      if (response.ok) {
+        const status = await response.json();
+        setDataRangeStatus(status);
+      }
+    } catch (error) {
+      console.error('Error fetching data range status:', error);
+    }
+  };
+
+  // Load data range status on component mount
+  useEffect(() => {
+    fetchDataRangeStatus();
+  }, [ticker]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -458,21 +516,81 @@ function DataManagementDashboard({
               </div>
             </div>
 
-            {/* Mode Warning */}
-            {streamingMode === 'mock' && isStreaming && (
-              <div className="mt-1 px-1 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-700 rounded">
-                <p className="text-[8px] text-yellow-800 dark:text-yellow-300 font-semibold">
-                  ⚠️ MOCK MODE: Test data only
-                </p>
+        {/* Mode Warning */}
+        {streamingMode === 'mock' && isStreaming && (
+          <div className="mt-1 px-1 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-700 rounded">
+            <p className="text-[8px] text-yellow-800 dark:text-yellow-300 font-semibold">
+              ⚠️ MOCK MODE: Test data only
+            </p>
+          </div>
+        )}
+        {streamingMode === 'real' && isStreaming && (
+          <div className="mt-1 px-1 py-0.5 bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded">
+            <p className="text-[8px] text-green-800 dark:text-green-300 font-semibold">
+              🟢 LIVE MODE: Real Schwab data
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Auto-Backfill Section */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-2 border border-gray-200 dark:border-gray-700">
+        <h3 className="text-xs font-semibold text-gray-800 dark:text-gray-200 mb-2">
+          🔄 Auto-Backfill System
+        </h3>
+        
+        {/* Data Range Status */}
+        {dataRangeStatus && (
+          <div className="mb-2 text-[9px] text-gray-600 dark:text-gray-400">
+            <div className="grid grid-cols-2 gap-1">
+              <div>
+                <span className="font-medium">Equity:</span> {dataRangeStatus.data_ranges?.equity?.total_records || 0} records
+              </div>
+              <div>
+                <span className="font-medium">Options:</span> {dataRangeStatus.data_ranges?.options?.total_records || 0} records
+              </div>
+            </div>
+            <div className="mt-1">
+              <span className="font-medium">Last Update:</span> {dataRangeStatus.last_backfill ? new Date(dataRangeStatus.last_backfill).toLocaleString() : 'Never'}
+            </div>
+          </div>
+        )}
+
+        {/* Backfill Controls */}
+        <div className="space-y-1">
+          <button
+            onClick={handleAutoBackfill}
+            disabled={isBackfilling}
+            className={`w-full py-1 px-2 text-[9px] rounded transition-colors ${
+              isBackfilling
+                ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 cursor-not-allowed'
+                : 'bg-blue-600 hover:bg-blue-700 text-white'
+            }`}
+          >
+            {isBackfilling ? '⏳ Backfilling...' : '🔄 Auto-Backfill Data'}
+          </button>
+          
+          <div className="text-[8px] text-gray-600 dark:text-gray-400 text-center">
+            {backfillStatus}
+          </div>
+        </div>
+
+        {/* Backfill Results */}
+        {backfillResults && (
+          <div className="mt-2 p-1 bg-gray-50 dark:bg-gray-700 rounded text-[8px]">
+            <div className="font-medium text-gray-800 dark:text-gray-200 mb-1">Results:</div>
+            {backfillResults.backfilled_data?.equity && (
+              <div className="mb-1">
+                <span className="text-green-600 dark:text-green-400">Equity:</span> +{backfillResults.backfilled_data.equity.records_added} records
               </div>
             )}
-            {streamingMode === 'real' && isStreaming && (
-              <div className="mt-1 px-1 py-0.5 bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded">
-                <p className="text-[8px] text-green-800 dark:text-green-300 font-semibold">
-                  🟢 LIVE MODE: Real Schwab data
-                </p>
+            {backfillResults.backfilled_data?.options && (
+              <div>
+                <span className="text-blue-600 dark:text-blue-400">Options:</span> +{backfillResults.backfilled_data.options.records_added} records
               </div>
             )}
+          </div>
+        )}
           </div>
 
           {/* Live Data Feed */}
