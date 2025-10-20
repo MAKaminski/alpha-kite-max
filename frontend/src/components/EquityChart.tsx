@@ -419,10 +419,10 @@ function EquityChart({
               color: '#F9FAFB',
             }}
             labelFormatter={(label) => `${formatToEST(label, 'h:mm:ss a')} EST`}
-            formatter={(value: any, name: string) => {
-              // Safely handle any value type from Recharts
+            formatter={(value: number | string | number[] | string[], name: string) => {
+              // Safely handle value types from Recharts
               const numValue = typeof value === 'number' ? value : 
-                              Array.isArray(value) ? value[0] : 
+                              Array.isArray(value) ? (typeof value[0] === 'number' ? value[0] : parseFloat(String(value[0] || 0))) : 
                               parseFloat(String(value || 0));
               
               if (name === 'syntheticOptionPrice') {
