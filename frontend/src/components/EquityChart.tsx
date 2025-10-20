@@ -334,71 +334,17 @@ function EquityChart({
               {/* Synthetic option price markers - plotted on right axis */}
               {syntheticOptionPrices && syntheticOptionPrices.length > 0 && (
                 <Scatter
-                  xAxisId={0}
                   yAxisId="right"
-                  data={(() => {
-                    const scatterData = syntheticOptionPrices.map(opt => ({
-                      timestamp: opt.timestamp,
-                      price: opt.market_price,  // Plot market price on right axis
-                      optionType: opt.option_type,
-                      marketPrice: opt.market_price,
-                      strikePrice: opt.strike_price,
-                      symbol: opt.option_symbol
-                    }));
-                    console.log('🎯 Scatter data prepared:', scatterData.length, 'points');
-                    console.log('   Sample scatter points:', scatterData.slice(0, 3));
-                    return scatterData;
-                  })()}
+                  data={syntheticOptionPrices.map(opt => ({
+                    timestamp: opt.timestamp,
+                    price: opt.market_price,  // Plot market price on right axis
+                    optionType: opt.option_type,
+                    marketPrice: opt.market_price,
+                    strikePrice: opt.strike_price,
+                    symbol: opt.option_symbol
+                  }))}
                   dataKey="price"
                   fill="#F59E0B"
-                  shape={(props: unknown) => {
-                    try {
-                      const { cx, cy, payload } = props as { cx: number; cy: number; payload: { price?: number; optionType?: string; strikePrice?: number } };
-                      if (!payload?.price || !payload?.optionType) {
-                        return <circle cx={0} cy={0} r={0} fill="transparent" />;
-                      }
-                      
-                      const color = payload.optionType === 'CALL' ? '#F59E0B' : '#EF4444';
-                      const symbol = payload.optionType === 'CALL' ? 'C' : 'P';
-                      
-                      return (
-                        <g>
-                          <circle
-                            cx={cx}
-                            cy={cy}
-                            r={6}
-                            fill={color}
-                            stroke="#FFF"
-                            strokeWidth={2}
-                            strokeDasharray="3 3"
-                          />
-                          <text
-                            x={cx}
-                            y={cy + 3}
-                            textAnchor="middle"
-                            fill="#FFF"
-                            fontSize="8"
-                            fontWeight="bold"
-                          >
-                            {symbol}
-                          </text>
-                          <text
-                            x={cx}
-                            y={cy - 8}
-                            textAnchor="middle"
-                            fill="#FFF"
-                            fontSize="6"
-                            fontWeight="bold"
-                          >
-                            SYN
-                          </text>
-                        </g>
-                      );
-                    } catch (error) {
-                      console.warn('Error rendering synthetic option marker:', error);
-                      return <circle cx={0} cy={0} r={0} fill="transparent" />;
-                    }
-                  }}
                   name="Synthetic Option Prices"
                 />
               )}
