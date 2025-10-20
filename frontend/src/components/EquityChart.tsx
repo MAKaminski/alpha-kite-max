@@ -246,15 +246,6 @@ function EquityChart({
             domain={['auto', 'auto']}
             label={{ value: 'Equity Price', angle: -90, position: 'insideLeft', style: { fill: '#6B7280' } }}
           />
-          <YAxis
-            yAxisId="right"
-            orientation="right"
-            tickFormatter={(value) => `$${value.toFixed(2)}`}
-            stroke="#F59E0B"
-            style={{ fontSize: '12px' }}
-            domain={['auto', 'auto']}
-            label={{ value: 'Option Price', angle: 90, position: 'insideRight', style: { fill: '#F59E0B' } }}
-          />
           <Tooltip
             contentStyle={{
               backgroundColor: '#1F2937',
@@ -354,18 +345,57 @@ function EquityChart({
                   name="Real Option Prices"
                 />
               )}
-
-              {/* Synthetic option price markers - plotted on right axis */}
-              {syntheticOptionPrices && syntheticOptionPrices.length > 0 && (
-                <Scatter
-                  yAxisId="right"
-                  dataKey="syntheticOptionPrice"
-                  fill="#F59E0B"
-                  name="Synthetic Option Prices"
-                />
-              )}
             </ComposedChart>
       </ResponsiveContainer>
+
+      {/* Separate Options Chart */}
+      {syntheticOptionPrices && syntheticOptionPrices.length > 0 && (
+        <div className="mt-4">
+          <div className="text-sm text-gray-400 mb-2">🧮 SYNTHETIC OPTIONS DATA (Black-Scholes Model)</div>
+          <ResponsiveContainer width="100%" height={200}>
+            <ComposedChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.2} />
+              <XAxis
+                dataKey="timestamp"
+                tickFormatter={formatTime}
+                stroke="#6B7280"
+                style={{ fontSize: '12px' }}
+              />
+              <YAxis
+                tickFormatter={(value) => `$${value.toFixed(2)}`}
+                stroke="#F59E0B"
+                style={{ fontSize: '12px' }}
+                domain={['auto', 'auto']}
+                label={{ value: 'Option Price', angle: -90, position: 'insideLeft', style: { fill: '#F59E0B' } }}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: '#1F2937',
+                  border: '1px solid #374151',
+                  borderRadius: '8px',
+                  color: '#F9FAFB',
+                }}
+                labelFormatter={(label) => `${formatToEST(label, 'h:mm:ss a')} EST`}
+                formatter={(value: number, name: string) => {
+                  if (name === 'syntheticOptionPrice') {
+                    return [`$${value.toFixed(2)}`, 'Option Price'];
+                  }
+                  return [`$${value.toFixed(2)}`, name];
+                }}
+              />
+              <Legend
+                wrapperStyle={{ paddingTop: '20px' }}
+                iconType="circle"
+              />
+              <Scatter
+                dataKey="syntheticOptionPrice"
+                fill="#F59E0B"
+                name="Synthetic Option Prices"
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       {/* Volume Bar Chart */}
       <div className="mt-2">
