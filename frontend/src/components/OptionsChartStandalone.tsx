@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ResponsiveContainer, ComposedChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line } from 'recharts';
+import { CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 type OptionRow = {
   timestamp: string;
@@ -17,7 +17,7 @@ export default function OptionsChartStandalone() {
     const load = async () => {
       const res = await fetch(`/api/get-options-for-chart?ticker=${ticker}&date=${date}`);
       const json = await res.json();
-      const rows: OptionRow[] = (json.data || []).map((r: any) => ({ timestamp: r.timestamp, market_price: r.market_price }));
+      const rows: OptionRow[] = (json.data || []).map((r: { timestamp: string; market_price: number }) => ({ timestamp: r.timestamp, market_price: r.market_price }));
       // minute-bucket average
       const byMinute: Record<string, { sum: number; count: number }> = {};
       for (const r of rows) {

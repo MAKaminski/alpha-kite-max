@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import { createClient } from '@supabase/supabase-js';
 import dynamic from 'next/dynamic';
 
 const OptionsChart = dynamic(() => import('@/components/OptionsChartStandalone'), { ssr: false });
