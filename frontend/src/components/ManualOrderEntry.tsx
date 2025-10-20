@@ -39,6 +39,9 @@ export default function ManualOrderEntry({
   const [contracts, setContracts] = useState<number>(10);
   const [isLoading, setIsLoading] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [orderStatus, setOrderStatus] = useState<string | null>(null);
+  const [orderId, setOrderId] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Auto-populate order based on current market conditions
   const populateOrder = async (action: 'SELL_TO_OPEN' | 'BUY_TO_CLOSE') => {
@@ -75,34 +78,79 @@ export default function ManualOrderEntry({
   const handleSubmit = async () => {
     if (!orderPreview) return;
 
+    setIsSubmitting(true);
+    setOrderStatus('SUBMITTING');
+
     try {
-      const response = await fetch('/api/submit-manual-order', {
+      const response = await fetch('/api/submit-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(orderPreview)
+        body: JSON.stringify({
+          ...orderPreview,
+          mode: 'manual'
+        })
       });
 
       if (response.ok) {
         const result = await response.json();
         console.log('Order submitted successfully:', result);
         
+        setOrderId(result.order.order_id);
+        setOrderStatus('PENDING');
+        
+        // Start polling for order status
+        pollOrderStatus(result.order.order_id);
+        
         // Call parent callback
         if (onSubmit) {
           onSubmit(orderPreview);
         }
-        
-        // Reset state
-        setOrderPreview(null);
-        setShowConfirmation(false);
       } else {
         const error = await response.json();
         console.error('Order submission failed:', error);
+        setOrderStatus('FAILED');
         alert(`Order failed: ${error.error}`);
       }
     } catch (error) {
       console.error('Error submitting order:', error);
+      setOrderStatus('FAILED');
       alert('Failed to submit order');
+    } finally {
+      setIsSubmitting(false);
     }
+  };
+
+  const pollOrderStatus = async (orderId: string) => {
+    const maxAttempts = 10;
+    let attempts = 0;
+
+    const poll = async () => {
+      try {
+        const response = await fetch(`/api/order-status?order_id=${orderId}`);
+        if (response.ok) {
+          const result = await response.json();
+          setOrderStatus(result.order.status);
+          
+          if (result.order.status === 'FILLED' || result.order.status === 'FAILED') {
+            // Order completed, stop polling
+            return;
+          }
+        }
+        
+        attempts++;
+        if (attempts < maxAttempts) {
+          setTimeout(poll, 2000); // Poll every 2 seconds
+        } else {
+          setOrderStatus('TIMEOUT');
+        }
+      } catch (error) {
+        console.error('Error polling order status:', error);
+        setOrderStatus('ERROR');
+      }
+    };
+
+    // Start polling after a short delay
+    setTimeout(poll, 1000);
   };
 
   const handleCancel = () => {
@@ -203,6 +251,36 @@ export default function ManualOrderEntry({
         </div>
       )}
 
+      {/* Order Status */}
+      {orderStatus && (
+        <div className="mb-3 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-medium text-blue-800 dark:text-blue-300">
+              Order Status:
+            </span>
+            <span className={`font-semibold ${
+              orderStatus === 'FILLED' ? 'text-green-600' :
+              orderStatus === 'PENDING' || orderStatus === 'SUBMITTING' ? 'text-yellow-600' :
+              orderStatus === 'FAILED' || orderStatus === 'ERROR' || orderStatus === 'TIMEOUT' ? 'text-red-600' :
+              'text-gray-600'
+            }`}>
+              {orderStatus === 'SUBMITTING' ? '⏳ SUBMITTING...' :
+               orderStatus === 'PENDING' ? '⏳ PENDING' :
+               orderStatus === 'FILLED' ? '✅ FILLED' :
+               orderStatus === 'FAILED' ? '❌ FAILED' :
+               orderStatus === 'ERROR' ? '❌ ERROR' :
+               orderStatus === 'TIMEOUT' ? '⏰ TIMEOUT' :
+               orderStatus}
+            </span>
+          </div>
+          {orderId && (
+            <div className="text-[10px] text-blue-600 dark:text-blue-400 mt-1">
+              Order ID: {orderId}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Order Preview */}
       {showConfirmation && orderPreview && (
         <div className="mb-3 p-2 bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-400 dark:border-yellow-600 rounded">
@@ -276,9 +354,14 @@ export default function ManualOrderEntry({
             </button>
             <button
               onClick={handleSubmit}
-              className="py-1 px-2 text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded transition-colors"
+              disabled={isSubmitting}
+              className={`py-1 px-2 text-xs font-semibold rounded transition-colors ${
+                isSubmitting
+                  ? 'bg-gray-500 text-gray-300 cursor-not-allowed'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white'
+              }`}
             >
-              ✓ Submit Order
+              {isSubmitting ? '⏳ Submitting...' : '✓ Submit Order'}
             </button>
           </div>
         </div>

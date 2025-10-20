@@ -16,6 +16,7 @@ import EquityChart from './EquityChart';
 import ESTClock from './ESTClock';
 import FeatureFlagsDashboard from './FeatureFlagsDashboard';
 import ManualOrderEntry from './ManualOrderEntry';
+import TradingModeToggle from './TradingModeToggle';
 import SignalsDashboard from './SignalsDashboard';
 import TradingDashboard from './TradingDashboard';
 
@@ -79,6 +80,7 @@ export default function Dashboard() {
   
   const [portfolioData, setPortfolioData] = useState<PortfolioData | null>(null);
   const [currentPrice, setCurrentPrice] = useState(0);
+  const [tradingMode, setTradingMode] = useState<'automatic' | 'manual'>('automatic');
   // Admin panel is now inline on Admin tab; keep state removed
 
   // Feature flags
@@ -384,6 +386,12 @@ export default function Dashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate, ticker, optionPricesEnabled, realTimeOptionsEnabled]);
 
+  // Also fetch synthetic options on initial load
+  useEffect(() => {
+    fetchSyntheticOptionPrices();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Start real-time options pricing for current ticker (only if enabled)
   useEffect(() => {
     if (!realTimeOptionsEnabled) {
@@ -629,8 +637,18 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Manual Order Entry */}
+        {/* Trading Mode Toggle */}
         {!loading && !error && (
+          <div className="mb-3">
+            <TradingModeToggle
+              mode={tradingMode}
+              onModeChange={setTradingMode}
+            />
+          </div>
+        )}
+
+        {/* Manual Order Entry - Only show in manual mode */}
+        {!loading && !error && tradingMode === 'manual' && (
           <div className="mb-3">
             <ManualOrderEntry
               ticker={ticker}
@@ -649,6 +667,23 @@ export default function Dashboard() {
                   .catch(err => console.error('Error refreshing portfolio:', err));
               }}
             />
+          </div>
+        )}
+
+        {/* Automatic Trading Status */}
+        {!loading && !error && tradingMode === 'automatic' && (
+          <div className="mb-3">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+              <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">
+                🤖 Automatic Trading
+              </h3>
+              <div className="text-xs text-gray-600 dark:text-gray-400">
+                System is monitoring market conditions and will execute trades automatically based on the SMA9/VWAP strategy.
+              </div>
+              <div className="mt-2 p-2 bg-green-50 dark:bg-green-900/20 rounded text-xs text-green-700 dark:text-green-300">
+                ✅ Automatic trading is active
+              </div>
+            </div>
           </div>
         )}
 
