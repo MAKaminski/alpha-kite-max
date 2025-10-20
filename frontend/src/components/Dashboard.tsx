@@ -26,7 +26,29 @@ export default function Dashboard() {
   const [todayCrosses, setTodayCrosses] = useState<Cross[]>([]);
   const [optionPrices, setOptionPrices] = useState<TradeOptionPrice[]>([]);
   const [realTimeOptionPrices, setRealTimeOptionPrices] = useState<RealTimeOptionPrice[]>([]);
-  const [syntheticOptionPrices, setSyntheticOptionPrices] = useState<any[]>([]);
+  interface SyntheticOption {
+    id: number;
+    timestamp: string;
+    ticker: string;
+    option_symbol: string;
+    option_type: string;
+    strike_price: number;
+    expiration_date: string;
+    spot_price: number;
+    market_price: number;
+    bid: number;
+    ask: number;
+    volume: number;
+    open_interest: number;
+    implied_volatility: number;
+    delta: number;
+    gamma: number;
+    theta: number;
+    vega: number;
+    data_source: string;
+  }
+  
+  const [syntheticOptionPrices, setSyntheticOptionPrices] = useState<SyntheticOption[]>([]);
   const [showNonMarketHours, setShowNonMarketHours] = useState(false);
   const [period, setPeriod] = useState<'minute' | 'hour'>('minute');
   const [loading, setLoading] = useState(true);
