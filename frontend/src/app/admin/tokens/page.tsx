@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import TokenManagement from '@/components/TokenManagement';
+import AdminPanelSimplified from '@/components/AdminPanelSimplified';
+import { useEffect, useState } from 'react';
 
 export default function TokenManagementPage() {
   const [mounted, setMounted] = useState(false);
@@ -35,8 +35,8 @@ export default function TokenManagementPage() {
           </p>
         </div>
 
-        {/* Token Management Component */}
-        <TokenManagement />
+        {/* Full Admin Panel Inline */}
+        <AdminPanelSimplified isOpen onClose={()=>{}} inline />
 
         {/* Additional Information */}
         <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">

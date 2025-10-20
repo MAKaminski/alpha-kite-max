@@ -10,7 +10,6 @@ import { useEffect, useState } from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { ChartDataPoint } from '../../../shared/types';
-import AdminPanelSimplified from './AdminPanelSimplified';
 import DarkModeToggle from './DarkModeToggle';
 import DataManagementDashboard from './DataManagementDashboard';
 import EquityChart from './EquityChart';
@@ -577,24 +576,7 @@ export default function Dashboard() {
           <SignalsDashboard crosses={todayCrosses} selectedDate={selectedDate} />
         )}
 
-        {/* Admin Panel Toggle */}
-        {adminPanelEnabled && (
-          <div className="fixed bottom-4 right-4">
-            <button
-              onClick={() => setShowAdminPanel(true)}
-              className="bg-gray-800 hover:bg-gray-700 text-white p-3 rounded-full shadow-lg transition-colors"
-              title="Open Admin Panel"
-            >
-              ⚙️
-            </button>
-          </div>
-        )}
-
-        {/* Admin Panel */}
-        <AdminPanelSimplified
-          isOpen={showAdminPanel}
-          onClose={() => setShowAdminPanel(false)}
-        />
+        {/* Admin controls moved to sticky top tabs (Options/Admin). Floating FAB removed. */}
       </div>
     </div>
   );

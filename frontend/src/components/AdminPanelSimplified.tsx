@@ -32,9 +32,10 @@ interface SystemMetrics {
 interface AdminPanelProps {
   isOpen: boolean;
   onClose: () => void;
+  inline?: boolean; // when true, render inline inside page (no overlay)
 }
 
-export default function AdminPanelSimplified({ isOpen, onClose }: AdminPanelProps) {
+export default function AdminPanelSimplified({ isOpen, onClose, inline = false }: AdminPanelProps) {
   const [metrics, setMetrics] = useState<SystemMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   
@@ -80,9 +81,10 @@ export default function AdminPanelSimplified({ isOpen, onClose }: AdminPanelProp
   const getStatusColor = (status: boolean) => status ? 'text-green-500' : 'text-red-500';
   const getStatusIcon = (status: boolean) => status ? '✅' : '❌';
 
+  const Container = inline ? 'div' : 'div';
   return (
-    <div className="fixed inset-0 bg-gray-50 dark:bg-gray-900 z-50 overflow-auto">
-      <div className="min-h-screen p-6">
+    <Container className={inline ? "" : "fixed inset-0 bg-gray-50 dark:bg-gray-900 z-50 overflow-auto"}>
+      <div className={inline ? "p-0" : "min-h-screen p-6"}>
         {/* Header */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-6">
           <div className="flex justify-between items-center">
@@ -90,12 +92,14 @@ export default function AdminPanelSimplified({ isOpen, onClose }: AdminPanelProp
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white">System Administration</h1>
               <p className="text-gray-600 dark:text-gray-400 mt-1">Complete system overview - Updates every 30 seconds</p>
             </div>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-3xl font-bold transition-colors"
-            >
-              ✕
-            </button>
+            {!inline && (
+              <button
+                onClick={onClose}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-3xl font-bold transition-colors"
+              >
+                ✕
+              </button>
+            )}
           </div>
         </div>
 
@@ -357,7 +361,7 @@ export default function AdminPanelSimplified({ isOpen, onClose }: AdminPanelProp
         ) : null}
 
       </div>
-    </div>
+    </Container>
   );
 }
 

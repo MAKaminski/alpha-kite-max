@@ -7,8 +7,9 @@
    2) Supabase CRUD
    3) Vercel retrieval & display of CRUD values
 
-
 # Schwab Documentation
 
 1. https://schwab-py.readthedocs.io/en/latest/ <--- Scrape entire website and encapsulate key learnings for login/auth/tokens/etc
 2. https://github.com/alexgolec/schwab-py
+
+1) Synthetic O
