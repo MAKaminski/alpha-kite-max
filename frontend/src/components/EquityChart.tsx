@@ -204,7 +204,8 @@ function EquityChart({
 
   // Select up to 6 option symbols near the median strike and merge as additional series
   const { mergedChartData, optionSeriesKeys } = React.useMemo(() => {
-    let baseChartData = chartData;
+    // Use any[] for intermediate processing to avoid type conflicts
+    let baseChartData: any[] = chartData;
     let selectedSymbols: string[] = [];
 
     // Merge synthetic options if available
@@ -234,16 +235,16 @@ function EquityChart({
         }
 
         // merge into chartData by timestamp
-        const byTs = new Map<string, Record<string, unknown>>(chartData.map(row => [row.timestamp, { ...row }]));
+        const byTs = new Map<string, any>(chartData.map(row => [row.timestamp, { ...row }]));
         for (const [ts, symbols] of Object.entries(bucket)) {
-          const row = (byTs.get(ts) as Record<string, unknown>) || ({ timestamp: ts } as Record<string, unknown>);
+          const row = byTs.get(ts) || { timestamp: ts };
           for (const sym of Object.keys(symbols)) {
             const agg = symbols[sym];
-            (row as Record<string, number | string>)[sym] = agg.sum / agg.count;
+            row[sym] = agg.sum / agg.count;
           }
           byTs.set(ts, row);
         }
-        baseChartData = Array.from(byTs.values()).sort((a,b)=> (a.timestamp as string).localeCompare(b.timestamp as string));
+        baseChartData = Array.from(byTs.values()).sort((a,b)=> a.timestamp.localeCompare(b.timestamp));
       } catch (e) {
         console.warn('Error merging option series into chart', e);
       }
@@ -251,7 +252,7 @@ function EquityChart({
 
     // Merge balance history if available
     if (balanceHistory && balanceHistory.length > 0) {
-      const byTs = new Map<string, Record<string, unknown>>(baseChartData.map(row => [row.timestamp, { ...row }]));
+      const byTs = new Map<string, any>(baseChartData.map(row => [row.timestamp, { ...row }]));
       
       for (const balancePoint of balanceHistory) {
         // Find closest timestamp in chart data (within 1 minute)
@@ -269,7 +270,7 @@ function EquityChart({
         }
         
         if (closestTs) {
-          const row = byTs.get(closestTs) as Record<string, unknown>;
+          const row = byTs.get(closestTs);
           if (row) {
             row.accountBalance = balancePoint.balance;
             row.openPositions = balancePoint.open_positions;
@@ -277,12 +278,12 @@ function EquityChart({
         }
       }
       
-      baseChartData = Array.from(byTs.values()).sort((a,b)=> (a.timestamp as string).localeCompare(b.timestamp as string));
+      baseChartData = Array.from(byTs.values()).sort((a,b)=> a.timestamp.localeCompare(b.timestamp));
     }
 
     // Add trade markers
     if (trades && trades.length > 0) {
-      const byTs = new Map<string, Record<string, unknown>>(baseChartData.map(row => [row.timestamp, { ...row }]));
+      const byTs = new Map<string, any>(baseChartData.map(row => [row.timestamp, { ...row }]));
       
       for (const trade of trades) {
         // Find closest timestamp in chart data
@@ -300,7 +301,7 @@ function EquityChart({
         }
         
         if (closestTs) {
-          const row = byTs.get(closestTs) as Record<string, unknown>;
+          const row = byTs.get(closestTs);
           if (row) {
             row.tradeMarker = trade.action;
             row.tradeSymbol = trade.option_symbol;
@@ -308,7 +309,7 @@ function EquityChart({
         }
       }
       
-      baseChartData = Array.from(byTs.values()).sort((a,b)=> (a.timestamp as string).localeCompare(b.timestamp as string));
+      baseChartData = Array.from(byTs.values()).sort((a,b)=> a.timestamp.localeCompare(b.timestamp));
     }
 
     return { mergedChartData: baseChartData, optionSeriesKeys: selectedSymbols };
