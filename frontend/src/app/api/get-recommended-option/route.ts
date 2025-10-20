@@ -55,33 +55,29 @@ export async function POST(request: NextRequest) {
     };
 
     if (action === 'SELL_TO_OPEN') {
+      // Always use ATM (At-The-Money) strikes - nearest strike to current price
       // Choose option type based on trend
+      strikePrice = roundToNearestStrike(current_price);
+      
       if (price_action?.trend === 'bullish') {
-        // Bullish: sell OTM puts (expect price to stay above strike)
+        // Bullish: sell ATM puts (higher premium, expect price to stay above strike)
         optionType = 'PUT';
-        // For bullish, sell slightly OTM put (1-2% below current price)
-        const otmPrice = current_price * 0.985; // 1.5% OTM
-        strikePrice = roundToNearestStrike(otmPrice);
-        rationale = `Bullish trend detected (SMA9: ${price_action.sma9?.toFixed(2)}). Selling OTM PUT at $${strikePrice} (nearest strike to ${otmPrice.toFixed(2)}) with expectation price stays above strike.`;
+        rationale = `Bullish trend detected (SMA9: ${price_action.sma9?.toFixed(2)}). Selling ATM PUT at $${strikePrice} (nearest strike to ${current_price.toFixed(2)}) for premium collection with bullish price action support.`;
       } else if (price_action?.trend === 'bearish') {
-        // Bearish: sell OTM calls (expect price to stay below strike)
+        // Bearish: sell ATM calls (higher premium, expect price to stay below strike)
         optionType = 'CALL';
-        // For bearish, sell slightly OTM call (1-2% above current price)
-        const otmPrice = current_price * 1.015; // 1.5% OTM
-        strikePrice = roundToNearestStrike(otmPrice);
-        rationale = `Bearish trend detected (SMA9: ${price_action.sma9?.toFixed(2)}). Selling OTM CALL at $${strikePrice} (nearest strike to ${otmPrice.toFixed(2)}) with expectation price stays below strike.`;
+        rationale = `Bearish trend detected (SMA9: ${price_action.sma9?.toFixed(2)}). Selling ATM CALL at $${strikePrice} (nearest strike to ${current_price.toFixed(2)}) for premium collection with bearish price action support.`;
       } else {
-        // Neutral: sell ATM put (higher premium)
+        // Neutral: sell ATM put (higher premium, neutral expectation)
         optionType = 'PUT';
-        strikePrice = roundToNearestStrike(current_price);
-        rationale = `Neutral trend. Selling ATM PUT at $${strikePrice} (nearest strike to ${current_price.toFixed(2)}) for premium collection.`;
+        rationale = `Neutral trend. Selling ATM PUT at $${strikePrice} (nearest strike to ${current_price.toFixed(2)}) for maximum premium collection.`;
       }
     } else {
-      // BUY_TO_CLOSE: use nearest strike to current price
+      // BUY_TO_CLOSE: use nearest strike to current price (ATM)
       // For now, assume we're closing a PUT position
       optionType = 'PUT';
       strikePrice = roundToNearestStrike(current_price);
-      rationale = `Closing existing position at nearest strike $${strikePrice} to current market price $${current_price.toFixed(2)}.`;
+      rationale = `Closing existing position at ATM strike $${strikePrice} (nearest to current market price $${current_price.toFixed(2)}).`;
     }
 
     // Generate option symbol
