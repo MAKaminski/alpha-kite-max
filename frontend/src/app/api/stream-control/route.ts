@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { action, ticker } = body;
+    const { action, ticker, mode = 'mock', type = 'both' } = body;
 
     // Validate inputs
     if (!action || !['start', 'stop'].includes(action)) {
@@ -23,6 +23,20 @@ export async function POST(request: NextRequest) {
     if (!ticker) {
       return NextResponse.json(
         { error: 'Ticker symbol is required' },
+        { status: 400 }
+      );
+    }
+
+    if (action === 'start' && (!mode || !['mock', 'real'].includes(mode))) {
+      return NextResponse.json(
+        { error: 'Mode must be "mock" or "real"' },
+        { status: 400 }
+      );
+    }
+
+    if (action === 'start' && (!type || !['equity', 'options', 'both'].includes(type))) {
+      return NextResponse.json(
+        { error: 'Type must be "equity", "options", or "both"' },
         { status: 400 }
       );
     }
@@ -46,7 +60,9 @@ export async function POST(request: NextRequest) {
       success: true,
       action,
       ticker,
-      message: `Streaming ${action === 'start' ? 'started' : 'stopped'} for ${ticker}`,
+      mode: action === 'start' ? mode : undefined,
+      type: action === 'start' ? type : undefined,
+      message: `Streaming ${action === 'start' ? 'started' : 'stopped'} for ${ticker}${action === 'start' ? ` (${mode} ${type})` : ''}`,
       timestamp: new Date().toISOString()
     });
 

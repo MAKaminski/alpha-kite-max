@@ -45,6 +45,8 @@ interface EquityChartProps {
   syntheticOptionPrices?: SyntheticOptionPrice[];
   showNonMarketHours?: boolean;
   onToggleNonMarketHours?: (show: boolean) => void;
+  showSyntheticOptions?: boolean;
+  onToggleSyntheticOptions?: (show: boolean) => void;
   marketHoursHighlighting?: boolean;
   period?: 'minute' | 'hour';
 }
@@ -58,6 +60,8 @@ function EquityChart({
   syntheticOptionPrices = [],
   showNonMarketHours = false,
   onToggleNonMarketHours,
+  showSyntheticOptions = true,
+  onToggleSyntheticOptions,
   marketHoursHighlighting = true,
   period = 'minute'
 }: EquityChartProps) {
@@ -112,6 +116,20 @@ function EquityChart({
           }
         });
   }, [data, showNonMarketHours]);
+
+  // Filter synthetic options to only show during market hours
+  const filteredSyntheticOptions = React.useMemo(() => {
+    if (!syntheticOptionPrices || syntheticOptionPrices.length === 0) return [];
+    
+    return syntheticOptionPrices.filter(option => {
+      try {
+        return isRegularTradingHours(option.timestamp);
+      } catch (error) {
+        console.warn('Error checking market hours for option:', error);
+        return false; // Default to hiding the option
+      }
+    });
+  }, [syntheticOptionPrices]);
 
   // Prepare chart data with option prices
   const chartData = React.useMemo(() => {

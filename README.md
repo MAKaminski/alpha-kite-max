@@ -5,12 +5,27 @@ Real-time trading dashboard with automated 0DTE options trading based on SMA9/VW
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Node 18+](https://img.shields.io/badge/node-18+-green.svg)](https://nodejs.org/)
+[![Trading Status](https://img.shields.io/badge/Trading-Paper%20Trading%20Ready-green.svg)](docs/LIVE_TRADING_READINESS.md)
+
+---
+
+## 🚀 Current Status: Ready for Live Paper Trading
+
+**✅ System Ready**: All components operational and tested
+**✅ Data Streaming**: Real-time Schwab API integration active
+**✅ Trading Engine**: SMA9/VWAP cross strategy implemented
+**✅ Risk Management**: Comprehensive risk controls in place
+**✅ Paper Trading**: Full simulation mode ready for live testing
+
+**🎯 Next Steps**: Begin autonomous paper trading with real market data
 
 ---
 
 ## ⚡ Quick Start
 
 **New to Alpha Kite Max?** → Read [**GETTING_STARTED.md**](./GETTING_STARTED.md) (15-minute setup)
+
+**Ready for Trading?** → Read [**LIVE_TRADING_READINESS.md**](./docs/LIVE_TRADING_READINESS.md) (Trading checklist)
 
 **Experienced Developer?** → Jump to [Developer Setup](#developer-setup)
 

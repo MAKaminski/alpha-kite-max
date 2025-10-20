@@ -14,6 +14,7 @@ import DarkModeToggle from './DarkModeToggle';
 import DataManagementDashboard from './DataManagementDashboard';
 import EquityChart from './EquityChart';
 import ESTClock from './ESTClock';
+import FeatureFlagsDashboard from './FeatureFlagsDashboard';
 import SignalsDashboard from './SignalsDashboard';
 import TradingDashboard from './TradingDashboard';
 
@@ -53,6 +54,7 @@ export default function Dashboard() {
   const [period, setPeriod] = useState<'minute' | 'hour'>('minute');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showFeatureFlags, setShowFeatureFlags] = useState(false);
   // Admin panel is now inline on Admin tab; keep state removed
 
   // Feature flags
@@ -309,6 +311,13 @@ export default function Dashboard() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticker, period, optionPricesEnabled, realTimeOptionsEnabled]);
+
+  // Listen for feature flags modal open event
+  useEffect(() => {
+    const handleOpenFeatureFlags = () => setShowFeatureFlags(true);
+    window.addEventListener('openFeatureFlags', handleOpenFeatureFlags);
+    return () => window.removeEventListener('openFeatureFlags', handleOpenFeatureFlags);
+  }, []);
 
   // Fetch option prices when date changes (only if enabled)
   useEffect(() => {
@@ -578,6 +587,12 @@ export default function Dashboard() {
 
         {/* Admin controls moved to sticky top tabs (Options/Admin). Floating FAB removed. */}
       </div>
+
+      {/* Feature Flags Modal */}
+      <FeatureFlagsDashboard 
+        isOpen={showFeatureFlags} 
+        onClose={() => setShowFeatureFlags(false)} 
+      />
     </div>
   );
 }

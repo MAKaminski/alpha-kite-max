@@ -33,12 +33,13 @@ function DataManagementDashboard({
   const [downloadStatus, setDownloadStatus] = useState<string>('');
 
   // Streaming Controls State
-  const [isStreaming, setIsStreaming] = useState(true); // Default to ON
-  const [streamingStatus, setStreamingStatus] = useState<string>('🟢 Live (DEMO)');
+  const [isStreaming, setIsStreaming] = useState(false); // Default to OFF for safety
+  const [streamingStatus, setStreamingStatus] = useState<string>('⚫ Stopped');
   const [dataFeed, setDataFeed] = useState<DataFeedItem[]>([]);
   const dataFeedRef = useRef<HTMLDivElement>(null);
   const streamIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const [isDemoMode, setIsDemoMode] = useState(true); // Track if using mock data
+  const [streamingMode, setStreamingMode] = useState<'mock' | 'real'>('mock'); // Track streaming mode
+  const [streamingType, setStreamingType] = useState<'equity' | 'options' | 'both'>('both'); // Track what to stream
 
   // Set default date to today and start streaming
   useEffect(() => {
@@ -50,8 +51,8 @@ function DataManagementDashboard({
     weekAgo.setDate(weekAgo.getDate() - 7);
     setStartDate(weekAgo.toISOString().split('T')[0]);
     
-    // Auto-start streaming in DEMO MODE
-    startDataFeed();
+    // Don't auto-start streaming for safety
+    // startDataFeed();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -124,19 +125,29 @@ function DataManagementDashboard({
         const response = await fetch('/api/stream-control', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'start', ticker })
+          body: JSON.stringify({ 
+            action: 'start', 
+            ticker,
+            mode: streamingMode,
+            type: streamingType
+          })
         });
 
         if (response.ok) {
-          // Currently using DEMO MODE - replace with real streaming when available
-          setStreamingStatus('🟢 Live (DEMO)');
-          setIsDemoMode(true);
-          startDataFeed();
+          const data = await response.json();
+          if (streamingMode === 'mock') {
+            setStreamingStatus('🟡 Live (MOCK)');
+            startDataFeed();
+          } else {
+            setStreamingStatus('🟢 Live (REAL)');
+            startRealDataFeed();
+          }
         } else {
           setStreamingStatus('❌ Failed');
           setIsStreaming(false);
         }
-      } catch {
+      } catch (error) {
+        console.error('Streaming start error:', error);
         setStreamingStatus('❌ Error');
         setIsStreaming(false);
       }
@@ -152,28 +163,23 @@ function DataManagementDashboard({
         });
 
         setStreamingStatus('⚫ Stopped');
-        setIsDemoMode(false);
         stopDataFeed();
-      } catch {
+      } catch (error) {
+        console.error('Streaming stop error:', error);
         setStreamingStatus('⚫ Stopped');
-        setIsDemoMode(false);
         stopDataFeed();
       }
     }
   };
 
-  // Start data feed (currently using DEMO/MOCK data)
+  // Start mock data feed for testing
   const startDataFeed = () => {
     // Clear existing interval
     if (streamIntervalRef.current) {
       clearInterval(streamIntervalRef.current);
     }
 
-    // TODO: Replace with actual WebSocket/SSE connection to real data
-    // For now, using DEMO MODE with simulated data
-    setIsDemoMode(true);
-    
-    // Simulate live data updates every second (DEMO MODE)
+    // Simulate live data updates every second (MOCK MODE)
     streamIntervalRef.current = setInterval(() => {
       const newDataPoint: DataFeedItem = {
         timestamp: new Date().toISOString(),
@@ -190,6 +196,40 @@ function DataManagementDashboard({
         return updated.slice(-15);
       });
     }, 1000);
+  };
+
+  // Start real data feed from Schwab
+  const startRealDataFeed = () => {
+    // Clear existing interval
+    if (streamIntervalRef.current) {
+      clearInterval(streamIntervalRef.current);
+    }
+
+    // Connect to real-time WebSocket or polling
+    streamIntervalRef.current = setInterval(async () => {
+      try {
+        // Fetch real-time data from backend
+        const response = await fetch(`/api/real-time-data?ticker=${ticker}&type=${streamingType}`);
+        if (response.ok) {
+          const data = await response.json();
+          const newDataPoint: DataFeedItem = {
+            timestamp: new Date().toISOString(),
+            ticker: ticker,
+            price: data.price || 0,
+            volume: data.volume || 0,
+            sma9: data.sma9 || 0,
+            vwap: data.vwap || 0
+          };
+
+          setDataFeed(prev => {
+            const updated = [...prev, newDataPoint];
+            return updated.slice(-15);
+          });
+        }
+      } catch (error) {
+        console.error('Real data feed error:', error);
+      }
+    }, 1000); // Real data every second
   };
 
   // Stop data feed
@@ -355,11 +395,81 @@ function DataManagementDashboard({
                 </span>
               </label>
             </div>
-            {/* DEMO MODE Warning */}
-            {isDemoMode && isStreaming && (
+            {/* Streaming Mode Selection */}
+            <div className="mb-1">
+              <label className="text-[9px] font-medium text-gray-700 dark:text-gray-300 block mb-0.5">
+                Mode:
+              </label>
+              <div className="flex gap-1">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    checked={streamingMode === 'mock'}
+                    onChange={() => setStreamingMode('mock')}
+                    className="mr-0.5"
+                  />
+                  <span className="text-[9px] text-gray-700 dark:text-gray-300">Mock</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    checked={streamingMode === 'real'}
+                    onChange={() => setStreamingMode('real')}
+                    className="mr-0.5"
+                  />
+                  <span className="text-[9px] text-gray-700 dark:text-gray-300">Real</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Streaming Type Selection */}
+            <div className="mb-1">
+              <label className="text-[9px] font-medium text-gray-700 dark:text-gray-300 block mb-0.5">
+                Type:
+              </label>
+              <div className="flex gap-1">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    checked={streamingType === 'equity'}
+                    onChange={() => setStreamingType('equity')}
+                    className="mr-0.5"
+                  />
+                  <span className="text-[9px] text-gray-700 dark:text-gray-300">Equity</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    checked={streamingType === 'options'}
+                    onChange={() => setStreamingType('options')}
+                    className="mr-0.5"
+                  />
+                  <span className="text-[9px] text-gray-700 dark:text-gray-300">Options</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    checked={streamingType === 'both'}
+                    onChange={() => setStreamingType('both')}
+                    className="mr-0.5"
+                  />
+                  <span className="text-[9px] text-gray-700 dark:text-gray-300">Both</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Mode Warning */}
+            {streamingMode === 'mock' && isStreaming && (
               <div className="mt-1 px-1 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-700 rounded">
                 <p className="text-[8px] text-yellow-800 dark:text-yellow-300 font-semibold">
-                  ⚠️ DEMO MODE: Simulated data (not real market data)
+                  ⚠️ MOCK MODE: Test data only
+                </p>
+              </div>
+            )}
+            {streamingMode === 'real' && isStreaming && (
+              <div className="mt-1 px-1 py-0.5 bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded">
+                <p className="text-[8px] text-green-800 dark:text-green-300 font-semibold">
+                  🟢 LIVE MODE: Real Schwab data
                 </p>
               </div>
             )}
