@@ -15,8 +15,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Initialize Supabase client (prefer server-side service role if available)
-    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !supabaseKey) {
       console.error('Missing Supabase credentials');
@@ -91,7 +91,7 @@ export async function GET(request: NextRequest) {
       date: date,
       ticker: ticker,
       diag_supabase_url: supabaseUrl,
-      diag_uses_service_role: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+      diag_uses_service_role: true,
     });
   } catch (error) {
     console.error('Error fetching options data:', error);

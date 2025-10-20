@@ -9,6 +9,11 @@ import React, { memo } from 'react';
 import { Bar, BarChart, CartesianGrid, ComposedChart, Legend, Line, ReferenceArea, ResponsiveContainer, Scatter, Tooltip, XAxis, YAxis } from 'recharts';
 import { ChartDataPoint } from '../../../shared/types';
 
+// Color palette for multiple option series
+const palette = [
+  '#F59E0B', '#EF4444', '#10B981', '#3B82F6', '#A855F7', '#F97316', '#22C55E', '#06B6D4', '#E11D48', '#8B5CF6'
+];
+
 interface SyntheticOptionPrice {
   id: number;
   timestamp: string;
