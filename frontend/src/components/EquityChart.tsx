@@ -158,7 +158,10 @@ function EquityChart({
         syntheticStrikePrice: opt.strike_price
       }));
       
-      return [...baseData, ...syntheticData];
+      const combinedData = [...baseData, ...syntheticData];
+      console.log('📊 Combined chart data:', combinedData.length, 'total points');
+      console.log('   Sample synthetic points:', syntheticData.slice(0, 3));
+      return combinedData;
     }
 
     return baseData;
@@ -263,7 +266,12 @@ function EquityChart({
               color: '#F9FAFB',
             }}
             labelFormatter={(label) => `${formatToEST(label, 'h:mm:ss a')} EST`}
-            formatter={(value: number) => [`$${value.toFixed(2)}`, '']}
+            formatter={(value: number, name: string) => {
+              if (name === 'syntheticOptionPrice') {
+                return [`$${value.toFixed(2)}`, 'Option Price'];
+              }
+              return [`$${value.toFixed(2)}`, name];
+            }}
           />
           <Legend
             wrapperStyle={{ paddingTop: '20px' }}
@@ -362,6 +370,8 @@ function EquityChart({
                   dataKey="syntheticOptionPrice"
                   fill="#F59E0B"
                   name="Synthetic Option Prices"
+                  shape="circle"
+                  r={4}
                 />
               )}
             </ComposedChart>
