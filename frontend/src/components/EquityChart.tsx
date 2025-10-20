@@ -202,12 +202,12 @@ function EquityChart({
       }
 
       // merge into chartData by timestamp
-      const byTs = new Map<string, any>(chartData.map(row => [row.timestamp, { ...row }]));
+      const byTs = new Map<string, Record<string, unknown>>(chartData.map(row => [row.timestamp, { ...row }]));
       for (const [ts, symbols] of Object.entries(bucket)) {
-        const row = byTs.get(ts) || { timestamp: ts } as any;
+        const row = (byTs.get(ts) as Record<string, unknown>) || ({ timestamp: ts } as Record<string, unknown>);
         for (const sym of Object.keys(symbols)) {
           const agg = symbols[sym];
-          row[sym] = agg.sum / agg.count;
+          (row as Record<string, number | string>)[sym] = agg.sum / agg.count;
         }
         byTs.set(ts, row);
       }
