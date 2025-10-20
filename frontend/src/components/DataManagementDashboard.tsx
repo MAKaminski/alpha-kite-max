@@ -1,7 +1,7 @@
 'use client';
 
 import { formatToEST } from '@/lib/timezone';
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import OptionsDownloadPanel from './OptionsDownloadPanel';
 
 interface DataFeedItem {
@@ -44,8 +44,8 @@ function DataManagementDashboard({
   // Auto-Backfill Controls State
   const [isBackfilling, setIsBackfilling] = useState(false);
   const [backfillStatus, setBackfillStatus] = useState<string>('Ready');
-  const [backfillResults, setBackfillResults] = useState<any>(null);
-  const [dataRangeStatus, setDataRangeStatus] = useState<any>(null);
+  const [backfillResults, setBackfillResults] = useState<Record<string, unknown> | null>(null);
+  const [dataRangeStatus, setDataRangeStatus] = useState<Record<string, unknown> | null>(null);
 
   // Set default date to today and start streaming
   useEffect(() => {
@@ -281,7 +281,7 @@ function DataManagementDashboard({
     }
   };
 
-  const fetchDataRangeStatus = async () => {
+  const fetchDataRangeStatus = useCallback(async () => {
     try {
       const response = await fetch(`/api/auto-backfill?ticker=${ticker}`);
       if (response.ok) {
@@ -291,12 +291,12 @@ function DataManagementDashboard({
     } catch (error) {
       console.error('Error fetching data range status:', error);
     }
-  };
+  }, [ticker]);
 
   // Load data range status on component mount
   useEffect(() => {
     fetchDataRangeStatus();
-  }, [ticker]);
+  }, [ticker, fetchDataRangeStatus]);
 
   // Cleanup on unmount
   useEffect(() => {

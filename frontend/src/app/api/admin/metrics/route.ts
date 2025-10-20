@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
  * 
  * Returns system health metrics for the admin panel.
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     // In production, this would fetch real metrics from:
     // - Supabase connection status

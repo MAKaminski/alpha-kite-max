@@ -11,7 +11,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { ticker = 'QQQ', data_types = ['equity', 'options'], force = false } = body;
+    const { ticker = 'QQQ', data_types = ['equity', 'options'] } = body;
 
     // Validate inputs
     if (!ticker || typeof ticker !== 'string') {
