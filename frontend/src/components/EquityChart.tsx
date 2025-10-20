@@ -393,6 +393,49 @@ function EquityChart({
       </ResponsiveContainer>
 
 
+      {/* Dedicated Options Chart (0DTE Synthetic) */}
+      {syntheticOptionPrices && syntheticOptionPrices.length > 0 && (
+        <div className="mt-3">
+          <div className="text-xs text-gray-400 mb-1">🧮 Synthetic 0DTE Options (Black-Scholes)</div>
+          <ResponsiveContainer width="100%" height={220}>
+            <ComposedChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.2} />
+              <XAxis
+                dataKey="timestamp"
+                tickFormatter={formatTime}
+                stroke="#6B7280"
+                style={{ fontSize: '12px' }}
+              />
+              <YAxis
+                tickFormatter={(v) => `$${v.toFixed(2)}`}
+                stroke="#F59E0B"
+                style={{ fontSize: '12px' }}
+                domain={["auto", "auto"]}
+                label={{ value: 'Option Price', angle: -90, position: 'insideLeft', style: { fill: '#F59E0B' } }}
+              />
+              <Tooltip
+                contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px', color: '#F9FAFB' }}
+                labelFormatter={(label) => `${formatToEST(label, 'h:mm:ss a')} EST`}
+                formatter={(value: number, name: string) => {
+                  if (name === 'syntheticOptionPrice') return [`$${value.toFixed(2)}`, 'Option Price'];
+                  return [`$${value.toFixed(2)}`, name];
+                }}
+              />
+              <Legend wrapperStyle={{ paddingTop: '8px' }} iconType="line" />
+              <Line
+                type="monotone"
+                dataKey="syntheticOptionPrice"
+                stroke="#F59E0B"
+                strokeWidth={2}
+                dot={{ r: 2, fill: '#F59E0B' }}
+                name="Synthetic Option Prices"
+                isAnimationActive={false}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
       {/* Volume Bar Chart */}
       <div className="mt-2">
         <ResponsiveContainer width="100%" height={120}>
