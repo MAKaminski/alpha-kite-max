@@ -213,10 +213,10 @@ function DataManagementDashboard({
         Data Management
       </h2>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-2">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-1">
         {/* Historical Data Download Panel */}
-        <div className="bg-gray-50 dark:bg-gray-900 rounded p-2 border border-gray-200 dark:border-gray-700">
-          <h3 className="text-xs font-semibold text-gray-900 dark:text-white mb-1 flex items-center">
+        <div className="bg-gray-50 dark:bg-gray-900 rounded p-1 border border-gray-200 dark:border-gray-700">
+          <h3 className="text-xs font-semibold text-gray-900 dark:text-white mb-0.5 flex items-center">
             <span className="mr-1">📥</span> Download
           </h3>
 
@@ -324,8 +324,8 @@ function DataManagementDashboard({
         </div>
 
         {/* Live Streaming Panel */}
-        <div className="bg-gray-50 dark:bg-gray-900 rounded p-2 border border-gray-200 dark:border-gray-700">
-          <h3 className="text-xs font-semibold text-gray-900 dark:text-white mb-1 flex items-center">
+        <div className="bg-gray-50 dark:bg-gray-900 rounded p-1 border border-gray-200 dark:border-gray-700">
+          <h3 className="text-xs font-semibold text-gray-900 dark:text-white mb-0.5 flex items-center">
             <span className="mr-1">📡</span> Stream
           </h3>
 

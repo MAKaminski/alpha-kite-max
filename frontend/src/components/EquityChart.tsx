@@ -138,30 +138,35 @@ function EquityChart({
       }
     });
 
-    // Add synthetic options as separate data points
+    // Add synthetic options data to existing equity data points
     if (syntheticOptionPrices && syntheticOptionPrices.length > 0) {
-      console.log('🎯 Adding synthetic options to chart data:', syntheticOptionPrices.length);
-      const syntheticData = syntheticOptionPrices.map(opt => ({
-        timestamp: opt.timestamp,
-        price: null, // No equity price for synthetic options
-        volume: null,
-        sma9: null,
-        vwap: null,
-        crossMarker: null,
-        optionPrice: null,
-        optionType: null,
-        optionSymbol: null,
-        // Synthetic option data
-        syntheticOptionPrice: opt.market_price,
-        syntheticOptionType: opt.option_type,
-        syntheticOptionSymbol: opt.option_symbol,
-        syntheticStrikePrice: opt.strike_price
-      }));
+      console.log('🎯 Processing synthetic options:', syntheticOptionPrices.length);
       
-      const combinedData = [...baseData, ...syntheticData];
-      console.log('📊 Combined chart data:', combinedData.length, 'total points');
-      console.log('   Sample synthetic points:', syntheticData.slice(0, 3));
-      return combinedData;
+      // Group options by timestamp and calculate average price
+      const optionsByTimestamp = syntheticOptionPrices.reduce((acc, opt) => {
+        if (!acc[opt.timestamp]) {
+          acc[opt.timestamp] = [];
+        }
+        acc[opt.timestamp].push(opt.market_price);
+        return acc;
+      }, {} as Record<string, number[]>);
+      
+      // Add synthetic option prices to existing equity data points
+      const enhancedData = baseData.map(point => {
+        const optionPrices = optionsByTimestamp[point.timestamp] || [];
+        const avgOptionPrice = optionPrices.length > 0 
+          ? optionPrices.reduce((sum, price) => sum + price, 0) / optionPrices.length 
+          : null;
+        
+        return {
+          ...point,
+          syntheticOptionPrice: avgOptionPrice
+        };
+      });
+      
+      console.log('📊 Enhanced chart data with options:', enhancedData.length, 'points');
+      console.log('   Sample with options:', enhancedData.filter(p => p.syntheticOptionPrice).slice(0, 3));
+      return enhancedData;
     }
 
     return baseData;
@@ -270,6 +275,15 @@ function EquityChart({
               if (name === 'syntheticOptionPrice') {
                 return [`$${value.toFixed(2)}`, 'Option Price'];
               }
+              if (name === 'price') {
+                return [`$${value.toFixed(2)}`, `${ticker} Price`];
+              }
+              if (name === 'sma9') {
+                return [`$${value.toFixed(2)}`, 'SMA9'];
+              }
+              if (name === 'vwap') {
+                return [`$${value.toFixed(2)}`, 'Session VWAP'];
+              }
               return [`$${value.toFixed(2)}`, name];
             }}
           />
@@ -363,15 +377,16 @@ function EquityChart({
                 />
               )}
 
-              {/* Synthetic option price markers - plotted on right axis */}
+              {/* Synthetic option price line - plotted on right axis */}
               {syntheticOptionPrices && syntheticOptionPrices.length > 0 && (
-                <Scatter
+                <Line
                   yAxisId="right"
+                  type="monotone"
                   dataKey="syntheticOptionPrice"
-                  fill="#F59E0B"
+                  stroke="#F59E0B"
+                  strokeWidth={2}
+                  dot={{ fill: '#F59E0B', r: 3 }}
                   name="Synthetic Option Prices"
-                  shape="circle"
-                  r={4}
                 />
               )}
             </ComposedChart>
