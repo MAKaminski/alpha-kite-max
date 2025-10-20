@@ -37,7 +37,7 @@ export default function OptionsChartStandalone() {
         strike_price: Number(r.strike_price)
       }));
 
-      if (!rows.length) { setData([]); setSeriesKeys([]); return; }
+      if (!rows.length) { console.log('OptionsChart: no rows'); setData([]); setSeriesKeys([]); return; }
 
       // Determine strike bounds
       const strikes = rows.map(r => r.strike_price).sort((a,b)=>a-b);
@@ -81,6 +81,23 @@ export default function OptionsChartStandalone() {
         return row;
       }).sort((a,b)=> (a.timestamp as string).localeCompare(b.timestamp as string));
 
+      console.log('OptionsChart: symbols', selectedSymbols.length, selectedSymbols.slice(0,5));
+      console.log('OptionsChart: rowsWide', rowsWide.length);
+      // Fallback: if no symbol-specific data made it into rowsWide, show overall average
+      if (selectedSymbols.length === 0 || rowsWide.every(r => Object.keys(r).length === 1)) {
+        const byMinute: Record<string, { sum:number; count:number }> = {};
+        for (const r of filtered) {
+          const minute = r.timestamp.slice(0,16)+':00';
+          byMinute[minute] = byMinute[minute] || { sum:0, count:0 };
+          byMinute[minute].sum += r.market_price;
+          byMinute[minute].count += 1;
+        }
+        const avgSeries: ChartPoint[] = Object.entries(byMinute).map(([ts, agg]) => ({ timestamp: ts, Average: agg.sum/agg.count }))
+          .sort((a,b)=> (a.timestamp as string).localeCompare(b.timestamp as string));
+        setSeriesKeys(['Average']);
+        setData(avgSeries);
+        return;
+      }
       setData(rowsWide);
     };
     load();

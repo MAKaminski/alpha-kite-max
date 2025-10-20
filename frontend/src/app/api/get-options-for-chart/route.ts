@@ -84,11 +84,13 @@ export async function GET(request: NextRequest) {
       data_source: row.data_source || 'black_scholes_synthetic',
     }));
 
+    // TEMP DIAGNOSTIC: include supabase URL to verify live env wiring (will be removed)
     return NextResponse.json({
       data: optionsData,
       count: optionsData.length,
       date: date,
       ticker: ticker,
+      diag_supabase_url: supabaseUrl,
     });
   } catch (error) {
     console.error('Error fetching options data:', error);
