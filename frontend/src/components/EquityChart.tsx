@@ -227,27 +227,46 @@ function EquityChart({
           .slice(0, 6)
           .map(([sym]) => sym);
 
-        // bucket by minute and symbol
-        const bucket: Record<string, Record<string, { sum:number; count:number }>> = {};
+        // Group options by exact timestamp and symbol
+        const optionsByTimestamp = new Map<string, Record<string, { sum: number; count: number }>>();
         for (const r of syntheticOptionPrices) {
           if (!selectedSymbols.includes(r.option_symbol)) continue;
-          const minute = r.timestamp.slice(0,16)+':00';
-          bucket[minute] = bucket[minute] || {};
-          bucket[minute][r.option_symbol] = bucket[minute][r.option_symbol] || { sum:0, count:0 };
-          bucket[minute][r.option_symbol].sum += r.market_price;
-          bucket[minute][r.option_symbol].count += 1;
+          const timestamp = r.timestamp;
+          if (!optionsByTimestamp.has(timestamp)) {
+            optionsByTimestamp.set(timestamp, {});
+          }
+          const bucket = optionsByTimestamp.get(timestamp)!;
+          if (!bucket[r.option_symbol]) {
+            bucket[r.option_symbol] = { sum: 0, count: 0 };
+          }
+          bucket[r.option_symbol].sum += r.market_price;
+          bucket[r.option_symbol].count += 1;
         }
 
-        // merge into chartData by timestamp
-        const byTs = new Map<string, ChartRow>(chartData.map(row => [row.timestamp, { ...row } as ChartRow]));
-        for (const [ts, symbols] of Object.entries(bucket)) {
-          const row = byTs.get(ts) || ({ timestamp: ts } as ChartRow);
-          for (const sym of Object.keys(symbols)) {
-            const agg = symbols[sym];
-            row[sym] = agg.sum / agg.count;
+        // Merge options into existing chart data by exact timestamp match
+        const byTs = new Map<string, ChartRow>(chartData.map(row => [String(row.timestamp), { ...row } as ChartRow]));
+        
+        // First, add options to existing equity timestamps
+        for (const [timestamp, symbols] of optionsByTimestamp) {
+          const row = byTs.get(timestamp);
+          if (row) {
+            for (const [symbol, agg] of Object.entries(symbols)) {
+              row[symbol] = agg.sum / agg.count;
+            }
           }
-          byTs.set(ts, row);
         }
+        
+        // Then, add any options timestamps that don't have equity data
+        for (const [timestamp, symbols] of optionsByTimestamp) {
+          if (!byTs.has(timestamp)) {
+            const row: ChartRow = { timestamp };
+            for (const [symbol, agg] of Object.entries(symbols)) {
+              row[symbol] = agg.sum / agg.count;
+            }
+            byTs.set(timestamp, row);
+          }
+        }
+        
         baseChartData = Array.from(byTs.values()).sort((a,b)=> String(a.timestamp).localeCompare(String(b.timestamp)));
       } catch (e) {
         console.warn('Error merging option series into chart', e);
