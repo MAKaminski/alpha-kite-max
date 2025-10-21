@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import structlog
 from schwab_integration.config import SupabaseConfig
-from supabase_client import SupabaseClient
+from clients.supabase_client import SupabaseClient
 
 # Configure logging
 structlog.configure(

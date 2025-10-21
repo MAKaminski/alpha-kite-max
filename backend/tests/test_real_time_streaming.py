@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from schwab_integration.client import SchwabClient
 from schwab_integration.downloader import EquityDownloader
 from schwab_integration.config import SchwabConfig, SupabaseConfig
-from supabase_client import SupabaseClient
+from clients.supabase_client import SupabaseClient
 import structlog
 
 logger = structlog.get_logger()

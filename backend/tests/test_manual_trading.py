@@ -15,7 +15,7 @@ from decimal import Decimal
 # Add backend to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from portfolio_tracker import PortfolioTracker
+from utils.portfolio_tracker import PortfolioTracker
 from models.trading import Position, Trade
 
 class TestManualTrading(unittest.TestCase):

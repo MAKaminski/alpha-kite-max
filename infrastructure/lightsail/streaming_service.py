@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../backend'))
 
 from schwab_integration.client import SchwabClient
 from schwab_integration.streaming import SchwabStreamingClient
-from supabase_client import SupabaseClient
+from clients.supabase_client import SupabaseClient
 
 load_dotenv()
 logger = structlog.get_logger()

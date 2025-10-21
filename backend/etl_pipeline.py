@@ -6,7 +6,7 @@ import structlog
 from schwab_integration.client import SchwabClient
 from schwab_integration.downloader import EquityDownloader
 from schwab_integration.config import SchwabConfig, SupabaseConfig, AppConfig
-from supabase_client import SupabaseClient
+from clients.supabase_client import SupabaseClient
 
 
 logger = structlog.get_logger()

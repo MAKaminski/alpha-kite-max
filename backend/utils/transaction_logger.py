@@ -12,7 +12,7 @@ from typing import Optional, Dict, Any
 from datetime import datetime
 import json
 import structlog
-from supabase_client import SupabaseClient
+from clients.supabase_client import SupabaseClient
 
 logger = structlog.get_logger()
 

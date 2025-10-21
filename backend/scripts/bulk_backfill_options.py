@@ -20,7 +20,7 @@ from dotenv import load_dotenv
 import time
 
 from polygon_integration.historic_options import PolygonHistoricOptions
-from supabase_client import SupabaseClient
+from clients.supabase_client import SupabaseClient
 
 load_dotenv()
 logger = structlog.get_logger()

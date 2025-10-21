@@ -19,7 +19,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from schwab_integration.client import SchwabClient
 from schwab_integration.downloader import PolygonDownloader
-from supabase_client import supabase
+from clients.supabase_client import supabase
 
 # Configure logging
 logging.basicConfig(

@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from schwab_integration.trading_engine import TradingEngine
 from schwab_integration.client import SchwabClient
-from supabase_client import SupabaseClient
+from clients.supabase_client import SupabaseClient
 from models.trading import Position, Trade, TradingSignal
 
 

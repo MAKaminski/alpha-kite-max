@@ -21,7 +21,7 @@ from schwab_integration.client import SchwabClient
 from schwab_integration.trading_engine import TradingEngine
 from schwab_integration.downloader import EquityDownloader
 from schwab_integration.config import SchwabConfig, SupabaseConfig
-from supabase_client import SupabaseClient
+from clients.supabase_client import SupabaseClient
 from models.trading import Position, Trade, TradingSignal
 
 

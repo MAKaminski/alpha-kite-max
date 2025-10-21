@@ -14,7 +14,7 @@ import structlog
 from dotenv import load_dotenv
 
 from .calculator import BlackScholesCalculator
-from supabase_client import SupabaseClient
+from clients.supabase_client import SupabaseClient
 
 load_dotenv()
 logger = structlog.get_logger()

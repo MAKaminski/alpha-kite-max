@@ -1,219 +1,164 @@
-# Backend Services
+# Backend - Python Services
 
-Python backend for downloading equity data from Schwab API and loading into Supabase.
+## Directory Structure
 
-## Setup
-
-### Prerequisites
-
-- **Python 3.10+** required (schwab-py dependency)
-- Check your version: `python3 --version`
-- If needed, use: `/opt/homebrew/bin/python3.10` (macOS Homebrew)
-
-### 1. Install Dependencies
-
-```bash
-cd backend
-# Use Python 3.10 or higher
-python3.10 -m venv venv  # Or python3 if default is 3.10+
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install --upgrade pip
-pip install -r requirements.txt
+```
+backend/
+├── main.py ............................ Main entry point for data operations
+├── trading_main.py .................... Main entry point for trading operations
+├── etl_pipeline.py .................... ETL pipeline orchestration
+│
+├── clients/ ........................... External service clients
+│   └── supabase_client.py ............. Supabase database client
+│
+├── models/ ............................ Data models
+│   └── trading.py ..................... Trading-related Pydantic models
+│
+├── schwab_integration/ ................ Schwab API integration
+│   ├── client.py ...................... Schwab API client wrapper
+│   ├── downloader.py .................. Data downloader
+│   ├── streaming.py ................... Real-time streaming
+│   ├── trading_engine.py .............. Trading execution engine
+│   ├── option_downloader.py ........... Options data downloader
+│   └── config.py ...................... Configuration models
+│
+├── polygon_integration/ ............... Polygon.io API integration
+│   ├── historic_options.py ............ Historical options data
+│   ├── options_stream.py .............. Real-time options streaming
+│   └── s3_bulk_downloader.py .......... S3 bulk data downloader
+│
+├── black_scholes/ ..................... Black-Scholes calculations
+│   ├── calculator.py .................. Black-Scholes calculator
+│   └── synthetic_generator.py ......... Synthetic options data generator
+│
+├── utils/ ............................. Utility modules
+│   ├── transaction_logger.py .......... Transaction logging
+│   └── portfolio_tracker.py ........... Portfolio tracking utilities
+│
+├── scripts/ ........................... Standalone scripts & tools
+│   ├── auto_backfill.py ............... Automatic data backfill
+│   ├── bulk_backfill_options.py ....... Bulk options backfill
+│   ├── download_0dte_options.py ....... 0DTE options downloader
+│   ├── standalone_qqq_download.py ..... Standalone QQQ downloader
+│   └── generate_synthetic_options.py .. Generate synthetic data
+│
+├── tests/ ............................. Test suite
+│   ├── test_schwab/ ................... Schwab integration tests
+│   ├── test_supabase/ ................. Supabase tests
+│   ├── integration/ ................... Integration tests
+│   ├── test_live_trading_workflow.py .. Live trading workflow tests
+│   └── [other test files]
+│
+└── sys_testing/ ....................... System testing & diagnostics
+    ├── auto_reauth.py ................. Automated re-authentication
+    ├── check_data_status.py ........... Data status checker
+    ├── token_diagnostics.py ........... Token health diagnostics
+    └── reauth_schwab.py ............... Schwab re-authentication
 ```
 
-### 2. Configure Environment
+## Main Entry Points
 
-Create a `.env` file in the `backend` directory:
-
-```bash
-# Schwab API
-SCHWAB_APP_KEY=your-schwab-app-key
-SCHWAB_APP_SECRET=your-schwab-app-secret
-
-# Supabase
-SUPABASE_URL=https://xwcauibwyxhsifnotnzz.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-```
-
-### 3. First-Time Schwab Authentication
-
-The first time you run the script, it will require manual OAuth authentication:
-
-```bash
-python main.py --test-connections
-```
-
-This will:
-1. Print a URL to authorize the application
-2. Open your browser to Schwab's OAuth page
-3. After authorization, you'll be redirected to a callback URL
-4. Copy the full callback URL and paste it back into the terminal
-5. Tokens will be saved to `.schwab_tokens.json` for future use
-
-**Note**: The callback URL will be shown - you need to click it yourself (per user preference).
-
-## Usage
-
-### Test Connections
-
-```bash
-python main.py --test-connections
-```
-
-### Download Data
-
-Download 5 days of QQQ data:
+### Data Operations
 ```bash
 python main.py --ticker QQQ --days 5
 ```
 
-Download 10 days of SPY data:
+### Trading Operations
 ```bash
-python main.py --ticker SPY --days 10
+python trading_main.py --mode paper --ticker QQQ
+```
+
+### ETL Pipeline
+```bash
+python etl_pipeline.py
+```
+
+## Scripts
+
+All standalone scripts are in `scripts/` directory:
+
+```bash
+# Backfill data
+python scripts/auto_backfill.py
+
+# Download 0DTE options
+python scripts/download_0dte_options.py
+
+# Generate synthetic options
+python scripts/generate_synthetic_options.py
 ```
 
 ## Testing
 
-Run all tests:
 ```bash
-cd backend
-source venv/bin/activate  # or .venv/bin/activate
-pytest
+# Run all tests
+pytest tests/ -v
+
+# Run specific test suite
+pytest tests/test_schwab/ -v
+
+# Run integration tests
+pytest tests/integration/ -v
+
+# Test live trading workflow
+pytest tests/test_live_trading_workflow.py -v
 ```
 
-Run specific test suites:
-```bash
-# Supabase tests only
-pytest tests/test_supabase/
-
-# Schwab tests only
-pytest tests/test_schwab/
-
-# Integration tests only
-pytest tests/integration/
-
-# Paper trading tests
-pytest tests/test_paper_trading.py
-
-# Current day tests
-pytest tests/test_current_day.py
-
-# Comprehensive test suite
-pytest tests/fortified_test_suite.py
-```
-
-With coverage:
-```bash
-pytest --cov=. --cov-report=html
-```
-
-## System Testing & Utilities
-
-The `sys_testing/` directory contains ad-hoc scripts for debugging, authentication, and maintenance:
-
-### OAuth & Authentication
-- `auto_reauth.py`: Automated Schwab OAuth re-authentication
-- `reauth_schwab.py`: Manual re-authentication flow
-- `get_auth_url.py`: Generate OAuth authorization URL
-- `process_callback.py`: Process OAuth callback and save tokens
-- `refresh_schwab_auth.py`: Refresh existing tokens
-
-### Diagnostics
-- `token_diagnostics.py`: Check token health and expiration
-- `check_data_status.py`: Verify data integrity in Supabase
-- `download_missing_data.py`: Backfill missing historical data
-- `fortified_token_manager.py`: Production-ready token management
-
-See `sys_testing/README.md` for detailed usage instructions.
-
-## Architecture
-
-```
-backend/
-├── schwab_integration/  # Schwab API integration
-│   ├── client.py       # API client wrapper
-│   ├── downloader.py   # Historical data downloader
-│   ├── streaming.py    # Real-time streaming
-│   ├── config.py       # Configuration models
-│   └── trading_engine.py # Trading execution
-├── models/             # Pydantic data models
-│   └── trading.py      # Trading models
-├── tests/              # Test suites
-│   ├── test_schwab/    # Schwab API tests
-│   ├── test_supabase/  # Database tests
-│   ├── integration/    # Integration tests
-│   ├── test_paper_trading.py
-│   ├── test_current_day.py
-│   └── fortified_test_suite.py
-├── sys_testing/        # System testing & ad-hoc utilities
-│   ├── auto_reauth.py  # Automated OAuth re-auth
-│   ├── token_diagnostics.py # Token health checks
-│   ├── check_data_status.py # Data integrity
-│   └── README.md       # Utilities documentation
-├── lambda/             # AWS Lambda deployment
-│   ├── real_time_streamer.py # Lambda handler
-│   ├── token_manager.py      # Token management
-│   └── deploy_*.sh           # Deployment scripts
-├── supabase_client.py  # Supabase CRUD operations
-├── etl_pipeline.py     # ETL orchestration
-├── main.py             # CLI entry point (data download)
-└── trading_main.py     # CLI entry point (trading)
-```
-
-## Data Flow
-
-1. **Extract**: Download minute-level price data from Schwab API
-2. **Transform**: Calculate technical indicators (SMA9, VWAP)
-3. **Load**: Insert data into Supabase (equity_data and indicators tables)
-
-## Dependencies
-
-Core dependencies:
-- `schwab-py`: Official Schwab API Python client
-- `supabase`: Supabase Python client
-- `pandas`: Data manipulation and indicator calculation
-- `pydantic`: Configuration and data model validation
-- `pytest`: Testing framework
-- `structlog`: Structured logging
-- `boto3`: AWS SDK (for Lambda and Secrets Manager)
-- `pytz`: Timezone handling
-
-### Package Management
-
-This project uses `uv` for faster package installation:
+## System Testing
 
 ```bash
-# Install uv (if not already installed)
-curl -LsSf https://astral.sh/uv/install.sh | sh
+# Check token status
+python sys_testing/token_diagnostics.py
 
+# Re-authenticate with Schwab
+python sys_testing/reauth_schwab.py
+
+# Check data status
+python sys_testing/check_data_status.py
+```
+
+## Import Examples
+
+```python
+# Using clients
+from clients.supabase_client import SupabaseClient
+
+# Using models
+from models.trading import Position, Trade, TradingSignal
+
+# Using Schwab integration
+from schwab_integration.client import SchwabClient
+from schwab_integration.trading_engine import TradingEngine
+
+# Using utilities
+from utils.transaction_logger import TransactionLogger
+from utils.portfolio_tracker import PortfolioTracker
+```
+
+## Development
+
+### Setup
+```bash
 # Create virtual environment
-cd backend
-uv venv
-source .venv/bin/activate  # or `venv\Scripts\activate` on Windows
+python -m venv .venv
+source .venv/bin/activate
 
-# Install dependencies (10-100x faster than pip)
-uv pip install -r requirements.txt
+# Install dependencies
+pip install -r requirements.txt
 ```
 
-**Why uv?**
-- 10-100x faster than pip for package resolution
-- Better dependency conflict detection
-- More efficient package caching
-- Drop-in replacement for pip
+### Code Organization Rules
 
-## Security
+1. **Only `main.py`, `trading_main.py`, and `etl_pipeline.py` should be in backend root**
+2. **Clients go in `clients/`** - Database clients, API clients
+3. **Models go in `models/`** - Pydantic models, data structures
+4. **Integrations go in `*_integration/`** - Third-party API integrations
+5. **Utils go in `utils/`** - Shared utilities and helpers
+6. **Scripts go in `scripts/`** - Standalone scripts and tools
+7. **Tests go in `tests/`** - All test files
+8. **System testing goes in `sys_testing/`** - Diagnostics and system tests
 
-⚠️ **Important**: Never commit credentials or tokens to Git!
+---
 
-See [SECURITY.md](../SECURITY.md) for:
-- Credential management best practices
-- OAuth token handling
-- Environment variable setup
-- AWS Secrets Manager configuration
-
-**Quick checklist:**
-- [ ] `.env` file is in `.gitignore`
-- [ ] `.schwab_tokens.json` is in `.gitignore`
-- [ ] Use `env.example` as template, never commit `.env`
-- [ ] Set file permissions: `chmod 600 .env`
-
+*Last Updated: October 21, 2025*  
+*Directory structure organized and cleaned*

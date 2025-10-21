@@ -5,7 +5,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 from unittest.mock import Mock, patch, MagicMock
 
-from supabase_client import SupabaseClient
+from clients.supabase_client import SupabaseClient
 from schwab_integration.config import SupabaseConfig
 
 

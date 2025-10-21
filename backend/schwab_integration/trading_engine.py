@@ -22,7 +22,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from supabase_client import SupabaseClient
+from clients.supabase_client import SupabaseClient
 from models.trading import Position, Trade, TradingSignal, DailyPnL
 
 logger = logging.getLogger(__name__)

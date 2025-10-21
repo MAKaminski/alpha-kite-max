@@ -17,7 +17,7 @@ import logging
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from models.trading import Position, Trade, TradingSignal
-from supabase_client import SupabaseClient
+from clients.supabase_client import SupabaseClient
 
 # Configure logging
 logging.basicConfig(

@@ -1,1 +1,0 @@
-{"errorMessage": "Syntax error in module 'real_time_streamer': invalid syntax (real_time_streamer.py, line 18)", "errorType": "Runtime.UserCodeSyntaxError", "requestId": "", "stackTrace": ["  File \"/var/task/real_time_streamer.py\" Line 18\n    from lambda.token_manager import TokenManager\n"]}
