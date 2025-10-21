@@ -16,9 +16,9 @@ import EquityChart from './EquityChart';
 import ESTClock from './ESTClock';
 import FeatureFlagsDashboard from './FeatureFlagsDashboard';
 import ManualOrderEntry from './ManualOrderEntry';
-import TradingModeToggle from './TradingModeToggle';
 import SignalsDashboard from './SignalsDashboard';
 import TradingDashboard from './TradingDashboard';
+import TradingModeToggle from './TradingModeToggle';
 
 export default function Dashboard() {
   const [ticker, setTicker] = useState('QQQ');

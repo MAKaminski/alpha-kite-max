@@ -1,0 +1,31 @@
+[Unit]
+Description=Equity/Options Streaming Service
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ec2-user
+WorkingDirectory=/opt/streaming-service
+EnvironmentFile=/opt/streaming-service/.env
+ExecStart=/usr/bin/python3 /opt/streaming-service/streaming_service.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=streaming-service
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/streaming-service/logs
+
+# Resource limits
+MemoryLimit=512M
+CPUQuota=50%
+
+[Install]
+WantedBy=multi-user.target
+

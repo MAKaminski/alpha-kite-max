@@ -17,16 +17,17 @@
 
 ## System Overview
 
-**Alpha Kite Max** is a real-time trading dashboard that streams equity market data, calculates technical indicators (SMA9, Session VWAP), and provides interactive data visualization. The system operates exclusively during regular U.S. market hours (9:30 AM - 4:00 PM ET, Monday-Friday).
+**Alpha Kite Max** is a real-time trading dashboard that streams equity market data, calculates technical indicators (SMA9, Session VWAP), and provides interactive data visualization using a microservices architecture.
 
 ### Key Characteristics
 
-- **Data Source**: Charles Schwab API (REST + OAuth 2.0)
-- **Update Frequency**: Every minute during market hours
-- **Data Granularity**: Minute-level OHLCV (Open, High, Low, Close, Volume)
+- **Architecture**: Microservices (AWS Lightsail + Vercel + Supabase)
+- **Data Source**: Charles Schwab WebSocket API (OAuth 2.0)
+- **Update Frequency**: Every second (real-time streaming)
+- **Data Granularity**: Second-level price/volume ticks
 - **Default Ticker**: QQQ (Invesco QQQ Trust)
-- **Operating Hours**: 390 minutes/day × 22 trading days/month ≈ 8,580 executions/month
-- **Latency Target**: < 5 seconds from market data to dashboard
+- **Operating Hours**: During market hours (9:30 AM - 4:00 PM ET)
+- **Latency Target**: < 2 seconds from market data to database
 
 ---
 
@@ -67,37 +68,30 @@
 └──────────────────────────────────────────────────────────────────────┘
                                 ↑
 ┌──────────────────────────────────────────────────────────────────────┐
-│                       DATA INGESTION LAYER (AWS)                      │
+│                   DATA INGESTION LAYER (AWS Lightsail)                │
 ├──────────────────────────────────────────────────────────────────────┤
 │                                                                       │
 │  ┌────────────────────────────────────────────────────────────┐     │
-│  │  AWS EventBridge (Scheduler)                               │     │
-│  │  • Rule 1: cron(30-59 13 ? * MON-FRI *)  → 9:30-9:59 AM ET │     │
-│  │  • Rule 2: cron(* 14-19 ? * MON-FRI *)   → 10:00-3:59 PM ET│     │
-│  │  • Rule 3: cron(0 20 ? * MON-FRI *)      → 4:00 PM ET      │     │
+│  │  AWS Lightsail Instance (Nano - $3.50/month)               │     │
+│  │  • Perpetual streaming service (Docker)                     │     │
+│  │  • Streams data every second                                │     │
+│  │  • Auto-restart on failures                                 │     │
+│  │  • Health monitoring built-in                               │     │
 │  └────────────────────────────────────────────────────────────┘     │
-│                             ↓ Trigger Event                          │
+│                             ↓ Streaming                              │
 │  ┌────────────────────────────────────────────────────────────┐     │
-│  │  AWS Lambda Function                                        │     │
-│  │  • Name: alpha-kite-real-time-streamer                      │     │
-│  │  • Runtime: Python 3.10                                     │     │
-│  │  • Memory: 256 MB                                           │     │
-│  │  • Timeout: 60 seconds                                      │     │
-│  │  • Handler: real_time_streamer.lambda_handler               │     │
+│  │  Streaming Service (Python)                                 │     │
+│  │  • Schwab WebSocket connection                              │     │
+│  │  • Real-time indicator calculation                          │     │
+│  │  • Batch writes every second                                │     │
+│  │  • Structured logging                                       │     │
 │  │                                                             │     │
-│  │  Dependencies (~80 MB):                                     │     │
+│  │  Dependencies:                                              │     │
 │  │    - schwab-py (Schwab API client)                          │     │
 │  │    - pandas (data processing)                               │     │
 │  │    - supabase-py (database client)                          │     │
-│  │    - boto3 (AWS SDK)                                        │     │
 │  │    - structlog (structured logging)                         │     │
 │  └────────────────────────────────────────────────────────────┘     │
-│                   ↓ Read                    ↓ Write                  │
-│  ┌──────────────────────────┐   ┌──────────────────────────────┐    │
-│  │  AWS Secrets Manager     │   │  AWS CloudWatch              │    │
-│  │  • Schwab OAuth token    │   │  • Lambda logs (14-day)       │    │
-│  │  • Auto-rotation enabled │   │  • Custom metrics             │    │
-│  └──────────────────────────┘   └──────────────────────────────┘    │
 │                                                                       │
 └──────────────────────────────────────────────────────────────────────┘
                                 ↑
@@ -275,20 +269,19 @@ CREATE POLICY "Public read access" ON indicators
 
 ---
 
-### 3. Data Ingestion Pipeline (AWS Lambda)
+### 3. Data Ingestion Pipeline (AWS Lightsail)
 
-#### Lambda Function Specifications
+#### Streaming Service Specifications
 
 | Property | Value |
 |----------|-------|
-| **Name** | `alpha-kite-real-time-streamer` |
-| **Runtime** | Python 3.10 |
-| **Handler** | `lambda.real_time_streamer.lambda_handler` |
-| **Memory** | 256 MB |
-| **Timeout** | 60 seconds |
-| **Package Size** | ~80 MB (with dependencies) |
-| **Concurrency** | 1 (no concurrent executions) |
-| **Deployment** | Via `backend/lambda/deploy_uv.sh` using `uv` for fast builds |
+| **Platform** | AWS Lightsail (Nano instance) |
+| **Runtime** | Python 3.10 (Docker container) |
+| **Service** | `infrastructure/lightsail/streaming_service.py` |
+| **Memory** | 512 MB |
+| **Execution** | Perpetual (always running) |
+| **Update Frequency** | Every 1 second |
+| **Deployment** | Via `infrastructure/lightsail/deploy.sh` |
 
 #### Execution Flow
 
@@ -334,50 +327,36 @@ CREATE POLICY "Public read access" ON indicators
 
 ---
 
-### 4. Scheduling (AWS EventBridge)
+### 4. Streaming Service (Perpetual Operation)
 
-#### Cron Rules (UTC timezone)
+#### Operating Model
 
-EventBridge uses UTC, while market hours are in ET (UTC-4 during EDT, UTC-5 during EST).
+The streaming service runs perpetually on AWS Lightsail:
 
-**Rule 1: Market Open (9:30-9:59 AM ET)**
+**Characteristics:**
+- **Always On**: No scheduling needed - service runs 24/7
+- **Market Hours Detection**: Built-in check (9:30 AM - 4:00 PM ET)
+- **Auto-restart**: Docker container restarts on failure
+- **Health Monitoring**: Built-in health check script
+
+**Data Flow:**
 ```
-cron(30-59 13 ? * MON-FRI *)
+Schwab WebSocket → Streaming Service (1-second batches) → Supabase
 ```
-- Triggers at 1:30-1:59 PM UTC (9:30-9:59 AM EDT)
-- 30 executions/day
 
-**Rule 2: Market Midday (10:00 AM - 3:59 PM ET)**
-```
-cron(* 14-19 ? * MON-FRI *)
-```
-- Triggers every minute from 2:00-7:59 PM UTC (10:00 AM - 3:59 PM EDT)
-- 360 executions/day
-
-**Rule 3: Market Close (4:00 PM ET)**
-```
-cron(0 20 ? * MON-FRI *)
-```
-- Triggers at 8:00 PM UTC (4:00 PM EDT)
-- 1 execution/day
-
-**Total**: 391 executions/trading day
-
-#### Timezone Handling
-- **EDT (Daylight Saving)**: March - November (UTC-4)
-- **EST (Standard Time)**: November - March (UTC-5)
-- **Current Implementation**: Hardcoded for EDT
-- **Recommendation**: Update cron rules twice/year or use Lambda-based market hours check
+**Writes per day**: ~23,400 records (during 6.5 hour trading session)
 
 ---
 
-### 5. Secret Management (AWS Secrets Manager)
+### 5. Secret Management (Environment Variables)
 
 #### Schwab OAuth Token
 
-**Secret Name**: `schwab-api-token-prod`
+**Storage Location**: `backend/config/schwab_token.json` (development)
 
-**Stored Data**:
+**Lightsail Production**: Stored in `.env` file on Lightsail instance
+
+**Token Data**:
 ```json
 {
   "access_token": "eyJ0eXAiOiJKV1QiLCJhbGc...",
@@ -389,21 +368,17 @@ cron(0 20 ? * MON-FRI *)
 
 **Rotation Policy**: Manual (7-day token expiration)
 
-**Access Control**: 
-- Lambda execution role has `secretsmanager:GetSecretValue` permission
-- Lambda can also write updated tokens after refresh
-
-**Cost**: $0.40/month per secret
+**Access Control**: File permissions (chmod 600) on Lightsail instance
 
 ---
 
-### 6. Monitoring (AWS CloudWatch)
+### 6. Monitoring (Docker Logs + Supabase)
 
-#### Log Groups
+#### Docker Container Logs
 
-**Name**: `/aws/lambda/alpha-kite-real-time-streamer`
+**Access**: SSH into Lightsail instance
 
-**Retention**: 14 days
+**Command**: `sudo docker-compose logs -f`
 
 **Log Format**: JSON (structured logging via `structlog`)
 
@@ -420,22 +395,30 @@ cron(0 20 ? * MON-FRI *)
 }
 ```
 
-#### Custom Metrics
+#### Supabase Metrics Table
 
-**Namespace**: `AlphaKiteMax/RealTimeStreaming`
+**Table**: `streaming_metrics`
 
-**Metrics**:
-- `DataPointsFetched`: Number of candles retrieved
-- `SupabaseUploadSuccess`: 1 (success) or 0 (failure)
-- `LatencyMilliseconds`: Total execution time
-- `TokenRefreshEvents`: Count of token refreshes
+**Tracks**:
+- Records processed per batch
+- Processing time
+- Error counts
+- Service status
 
-**Dimensions**: `Ticker=QQQ`, `Environment=prod`
+**Query Health**:
+```sql
+SELECT * FROM get_streaming_health('QQQ');
+```
 
-#### Alarms (Future)
-- No data fetched for 15 minutes during market hours
-- Lambda execution failures (threshold: 3 consecutive)
-- Token refresh failures
+#### Health Check Script
+
+**Local/Remote**: `python health_check.py`
+
+**Checks**:
+- Database connectivity
+- Data freshness (< 1 minute old)
+- Recent data presence
+- Error rates
 
 ---
 

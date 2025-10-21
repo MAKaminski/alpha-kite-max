@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  streaming-service:
+    build:
+      context: ../..
+      dockerfile: infrastructure/lightsail/Dockerfile
+    container_name: equity-options-streamer
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - STREAM_TICKER=${STREAM_TICKER:-QQQ}
+      - BATCH_SIZE=${BATCH_SIZE:-1}
+      - BATCH_INTERVAL=${BATCH_INTERVAL:-1}
+      - SCHWAB_APP_KEY=${SCHWAB_APP_KEY}
+      - SCHWAB_APP_SECRET=${SCHWAB_APP_SECRET}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+    volumes:
+      - ./logs:/app/logs
+      - ./config:/app/config
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "streaming_service.py"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
