@@ -1,34 +1,23 @@
-output "lambda_function_name" {
-  description = "Name of the Lambda function"
-  value       = aws_lambda_function.real_time_streamer.function_name
-}
-
-output "lambda_function_arn" {
-  description = "ARN of the Lambda function"
-  value       = aws_lambda_function.real_time_streamer.arn
-}
-
-output "lambda_role_arn" {
-  description = "ARN of the Lambda IAM role"
-  value       = aws_iam_role.lambda_role.arn
-}
+# Terraform Outputs for Lightsail Infrastructure
+# Note: Currently minimal as Lightsail deployment is handled via deploy.sh script
 
 output "schwab_token_secret_arn" {
-  description = "ARN of the Schwab token secret"
-  value       = aws_secretsmanager_secret.schwab_token.arn
+  description = "ARN of the Schwab token secret (optional, for AWS Secrets Manager)"
+  value       = try(aws_secretsmanager_secret.schwab_token.arn, "Not configured - using .env file instead")
 }
 
-output "cloudwatch_log_group" {
-  description = "CloudWatch log group for Lambda"
-  value       = aws_cloudwatch_log_group.lambda_logs.name
+output "aws_region" {
+  description = "AWS region for deployment"
+  value       = var.aws_region
 }
 
-output "eventbridge_rules" {
-  description = "EventBridge rules for scheduling"
-  value = {
-    market_open   = aws_cloudwatch_event_rule.market_hours_tick.name
-    market_midday = aws_cloudwatch_event_rule.market_hours_tick_10_to_15.name
-    market_close  = aws_cloudwatch_event_rule.market_hours_tick_close.name
-  }
+output "environment" {
+  description = "Environment name"
+  value       = var.environment
 }
 
+# Future: Add Lightsail instance outputs when managed via Terraform
+# output "lightsail_instance_ip" {
+#   description = "Public IP of Lightsail instance"
+#   value       = aws_lightsail_instance.streaming_service.public_ip_address
+# }
