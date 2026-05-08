@@ -143,8 +143,21 @@ class SupabaseBackend:
     async def _ensure_pool(self) -> Any:
         if self._pool is None:
             import asyncpg
+            import json
 
-            self._pool = await asyncpg.create_pool(self._dsn)
+            async def _init_conn(conn: Any) -> None:
+                # Register Python dict <-> JSONB/JSON codecs. Without this,
+                # asyncpg sees a dict for a JSONB column and raises
+                # "expected str, got dict".
+                for type_name in ("jsonb", "json"):
+                    await conn.set_type_codec(
+                        type_name,
+                        encoder=json.dumps,
+                        decoder=json.loads,
+                        schema="pg_catalog",
+                    )
+
+            self._pool = await asyncpg.create_pool(self._dsn, init=_init_conn)
         return self._pool
 
     async def close(self) -> None:
