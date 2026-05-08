@@ -143,15 +143,16 @@ if [[ -n "${RAILWAY_API_TOKEN:-}" ]]; then
   fi
 else
   echo "==> Railway: project token detected (project must already exist)"
-  echo "    Open https://railway.com first, click 'New Project' → 'Empty Project',"
-  echo "    name it (e.g. 'alpha-kite-v2'), then re-run this script."
-  echo "    Project tokens cannot create projects."
   export RAILWAY_TOKEN
-  # Verify the token works against an existing project
-  railway status 2>/dev/null | grep -qi 'project' || {
-    echo "ERROR: RAILWAY_TOKEN does not point at an existing project."
+  # Verify the token resolves to a project by listing its services. We use
+  # `service list` instead of `status` because `status` crashes (Abort trap)
+  # when its stderr is piped on macOS (Railway CLI bug as of 4.56).
+  if ! railway service list >/dev/null 2>&1; then
+    echo "ERROR: RAILWAY_TOKEN does not point at an accessible project."
+    echo "       Open https://railway.com → choose your project → Settings"
+    echo "       → Tokens → Create Token, then re-export RAILWAY_TOKEN."
     exit 1
-  }
+  fi
 fi
 
 if ! railway status 2>/dev/null | grep -qi 'project'; then
