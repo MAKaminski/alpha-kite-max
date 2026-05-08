@@ -21,7 +21,14 @@ set -euo pipefail
 
 # ──────────── REQUIRED env vars ──────────────────────────────────────────
 : "${VERCEL_TOKEN:?Generate at https://vercel.com/account/tokens}"
-: "${RAILWAY_TOKEN:?Generate at https://railway.app/account/tokens}"
+# Railway: account tokens use RAILWAY_API_TOKEN; older project tokens use
+# RAILWAY_TOKEN. We accept either but normalize to RAILWAY_API_TOKEN since
+# this script needs account-level commands (railway init, whoami, etc).
+if [[ -z "${RAILWAY_API_TOKEN:-}" && -n "${RAILWAY_TOKEN:-}" ]]; then
+  echo "==> NOTE: copying RAILWAY_TOKEN → RAILWAY_API_TOKEN (account token)"
+  export RAILWAY_API_TOKEN="$RAILWAY_TOKEN"
+fi
+: "${RAILWAY_API_TOKEN:?Generate an account token at https://railway.com/account/tokens (NOT a project token)}"
 : "${SUPABASE_URL:?From Project Settings → API}"
 : "${SUPABASE_PUBLISHABLE_KEY:?The 'publishable' (anon) key}"
 SUPABASE_DB_URL="${SUPABASE_DB_URL:-}"  # optional: skip migration if unset
@@ -119,7 +126,14 @@ command -v railway >/dev/null || {
 }
 echo "    $(railway --version)"
 
-export RAILWAY_TOKEN  # consumed by the CLI
+# Railway CLI reads RAILWAY_API_TOKEN for account-scoped ops
+export RAILWAY_API_TOKEN
+# Pre-flight: confirm the token actually authenticates before we try ops
+railway whoami || {
+  echo "ERROR: railway whoami failed. Generate an ACCOUNT token at"
+  echo "       https://railway.com/account/tokens (not a project token)"
+  exit 1
+}
 
 if ! railway status 2>/dev/null | grep -qi 'project'; then
   echo "==> Railway: init project alpha-kite-v2"
