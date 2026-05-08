@@ -97,7 +97,17 @@ export default function PriceChart({
         horzLines: { color: "#f3f4f6" },
       },
       crosshair: { mode: CrosshairMode.Normal },
-      rightPriceScale: { borderColor: "#e5e7eb", scaleMargins: { top: 0.05, bottom: 0.25 } },
+      // Price (candles + SMA + VWAP) lives on the right scale; volume gets
+      // its own visible LEFT scale so the user can read raw share counts.
+      rightPriceScale: {
+        borderColor: "#e5e7eb",
+        scaleMargins: { top: 0.05, bottom: 0.25 },
+      },
+      leftPriceScale: {
+        visible: true,
+        borderColor: "#e5e7eb",
+        scaleMargins: { top: 0.75, bottom: 0 },
+      },
       timeScale: {
         borderColor: "#e5e7eb",
         timeVisible: true,
@@ -131,15 +141,14 @@ export default function PriceChart({
       title: "VWAP",
     });
 
-    // Volume histogram pinned to the bottom 20% via its own (overlay) scale.
+    // Volume histogram bound to the LEFT price scale so the user can read
+    // raw share counts off the axis labels. The leftPriceScale options
+    // above already pin its drawing to the bottom 25% of the chart.
     const volumeSeries = chart.addHistogramSeries({
       priceFormat: { type: "volume" },
-      priceScaleId: "volume",
+      priceScaleId: "left",
       priceLineVisible: false,
       lastValueVisible: false,
-    });
-    chart.priceScale("volume").applyOptions({
-      scaleMargins: { top: 0.8, bottom: 0 },
     });
 
     if (bars.length > 0) {

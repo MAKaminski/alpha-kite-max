@@ -139,6 +139,23 @@ export default function ChartView({
 
   const todayStr = new Date().toISOString().slice(0, 10);
   const barCount = bars.length;
+
+  // Volume sanity stats so the user can eyeball whether the visual spikes
+  // match the raw share counts (e.g. the opening-auction first minute is
+  // legitimately 5–10x larger than steady-state minutes for QQQ).
+  const volumes = bars.map((b) => b.volume).filter((v) => v > 0);
+  const sortedVols = [...volumes].sort((a, b) => a - b);
+  const totalVolume = volumes.reduce((acc, v) => acc + v, 0);
+  const medianVolume = sortedVols.length === 0
+    ? 0
+    : sortedVols[Math.floor(sortedVols.length / 2)];
+  const maxVolume = sortedVols.length === 0 ? 0 : sortedVols[sortedVols.length - 1];
+  const fmtVol = (n: number): string => {
+    if (n >= 1e9) return `${(n / 1e9).toFixed(2)}B`;
+    if (n >= 1e6) return `${(n / 1e6).toFixed(2)}M`;
+    if (n >= 1e3) return `${(n / 1e3).toFixed(1)}k`;
+    return String(n);
+  };
   const signalCount = markers.filter(
     (m) => m.kind === "signal_up" || m.kind === "signal_down",
   ).length;
@@ -265,8 +282,17 @@ export default function ChartView({
           <span>
             <span className="font-medium text-gray-900">{fillCount}</span> fills
           </span>
+          <span title="Sum of per-bar share volume across the visible range">
+            vol Σ <span className="font-mono text-gray-900">{fmtVol(totalVolume)}</span>
+          </span>
+          <span title="Largest single bar in the visible range — opening minute often spikes 5–10×">
+            max <span className="font-mono text-gray-900">{fmtVol(maxVolume)}</span>
+          </span>
+          <span title="Median per-bar volume — gives a sense of steady-state minute volume">
+            med <span className="font-mono text-gray-900">{fmtVol(medianVolume)}</span>
+          </span>
           <span className="text-gray-500">
-            trade window: 09:40–15:30 ET (10 min after open · 30 min before close)
+            trade window: 09:40–15:30 ET
           </span>
         </div>
       </section>
