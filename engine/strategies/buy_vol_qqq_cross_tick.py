@@ -43,7 +43,8 @@ from contracts.strategy import (
     StrategyDecision,
 )
 
-_DEFAULT_CLOSE = time(20, 0, tzinfo=UTC)  # 4pm ET in UTC
+_DEFAULT_OPEN = time(13, 30, tzinfo=UTC)   # 9:30am ET in UTC (DST)
+_DEFAULT_CLOSE = time(20, 0, tzinfo=UTC)   # 4pm ET in UTC (DST)
 
 
 @dataclass
@@ -70,12 +71,16 @@ class BuyVolQQQCrossTickStrategy:
         profit_target_pct: Decimal = Decimal("30"),
         stop_loss_pct: Decimal = Decimal("25"),
         time_stop_minutes_before_close: int = 30,
+        entry_delay_minutes_after_open: int = 10,
+        session_open: time = _DEFAULT_OPEN,
         session_close: time = _DEFAULT_CLOSE,
     ) -> None:
         if sma_window_seconds <= 0:
             raise ValueError("sma_window_seconds must be positive")
         if confirmation_seconds < 0:
             raise ValueError("confirmation_seconds must be >= 0")
+        if entry_delay_minutes_after_open < 0:
+            raise ValueError("entry_delay_minutes_after_open must be >= 0")
         if mode not in ("directional", "straddle"):
             raise ValueError(f"unknown mode: {mode!r}")
 
@@ -87,6 +92,8 @@ class BuyVolQQQCrossTickStrategy:
         self.profit_target_pct = Decimal(profit_target_pct)
         self.stop_loss_pct = Decimal(stop_loss_pct)
         self.time_stop_minutes_before_close = time_stop_minutes_before_close
+        self.entry_delay_minutes_after_open = entry_delay_minutes_after_open
+        self.session_open = session_open
         self.session_close = session_close
 
         # Per-second mid samples: maps second-truncated-ts -> last seen mid
@@ -169,7 +176,15 @@ class BuyVolQQQCrossTickStrategy:
         diff = sma - vwap
         new_sign = 1 if diff > 0 else (-1 if diff < 0 else 0)
 
-        if self._last_diff_sign != 0 and new_sign not in (0, self._last_diff_sign):
+        # Cross detection — but only EMIT signals + arm pending entries
+        # inside the configured trade window. State (_last_diff_sign etc.)
+        # still tracks so charting/audit data remains continuous.
+        in_window = self._in_trade_window(ctx.now)
+        if (
+            in_window
+            and self._last_diff_sign != 0
+            and new_sign not in (0, self._last_diff_sign)
+        ):
             direction = (
                 SignalDirection.LONG_VOL_UP
                 if new_sign > 0
@@ -243,9 +258,7 @@ class BuyVolQQQCrossTickStrategy:
     def _gating_blocks_entry(self, ctx: StrategyContext) -> bool:
         if ctx.open_positions >= 1 or self._open_legs:
             return True
-        # Time stop: don't open inside the trailing window before close
-        cutoff = self._cutoff_time(ctx.now)
-        if ctx.now >= cutoff:
+        if not self._in_trade_window(ctx.now):
             return True
         return False
 
@@ -254,6 +267,20 @@ class BuyVolQQQCrossTickStrategy:
             now.date(), self.session_close, tzinfo=now.tzinfo or UTC
         )
         return close_dt - timedelta(minutes=self.time_stop_minutes_before_close)
+
+    def _entry_open_time(self, now: datetime) -> datetime:
+        open_dt = datetime.combine(
+            now.date(), self.session_open, tzinfo=now.tzinfo or UTC
+        )
+        return open_dt + timedelta(minutes=self.entry_delay_minutes_after_open)
+
+    def _in_trade_window(self, now: datetime) -> bool:
+        """True iff `now` is between (open + delay) and (close - time_stop)."""
+        if now < self._entry_open_time(now):
+            return False
+        if now >= self._cutoff_time(now):
+            return False
+        return True
 
     def _build_entries(
         self, ctx: StrategyContext, direction: SignalDirection

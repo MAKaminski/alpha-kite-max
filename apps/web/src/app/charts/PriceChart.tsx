@@ -30,13 +30,28 @@ function computeSma(bars: ChartBar[], period: number): { time: number; value: nu
   return out;
 }
 
+/** UTC date label "YYYY-MM-DD" for session-boundary detection. */
+function utcDay(unixSec: number): string {
+  return new Date(unixSec * 1000).toISOString().slice(0, 10);
+}
+
 /**
- * Cumulative session VWAP from typical price * volume. Falls back to the
- * supplied bar.vwap field when present (engine writes it for ibkr_live).
+ * Session VWAP from typical price * volume. Cumulative numerator/denominator
+ * reset on every new UTC trading day so multi-day chart ranges don't blend
+ * yesterday's volume into today's VWAP. The bar's own bar.vwap (when supplied
+ * by the engine) wins over our local calc.
  */
 function computeVwap(bars: ChartBar[]): { time: number; value: number }[] {
-  let pv = 0, v = 0;
+  let pv = 0;
+  let v = 0;
+  let curDay: string | null = null;
   return bars.map((b) => {
+    const day = utcDay(b.time);
+    if (day !== curDay) {
+      pv = 0;
+      v = 0;
+      curDay = day;
+    }
     if (b.vwap !== null) return { time: b.time, value: b.vwap };
     const typical = (b.high + b.low + b.close) / 3;
     pv += typical * b.volume;
@@ -63,7 +78,7 @@ export default function PriceChart({ bars, markers, smaPeriod = 9 }: Props) {
         horzLines: { color: "#f3f4f6" },
       },
       crosshair: { mode: CrosshairMode.Normal },
-      rightPriceScale: { borderColor: "#e5e7eb" },
+      rightPriceScale: { borderColor: "#e5e7eb", scaleMargins: { top: 0.05, bottom: 0.25 } },
       timeScale: {
         borderColor: "#e5e7eb",
         timeVisible: true,
@@ -97,6 +112,17 @@ export default function PriceChart({ bars, markers, smaPeriod = 9 }: Props) {
       title: "VWAP",
     });
 
+    // Volume histogram pinned to the bottom 20% via its own (overlay) scale.
+    const volumeSeries = chart.addHistogramSeries({
+      priceFormat: { type: "volume" },
+      priceScaleId: "volume",
+      priceLineVisible: false,
+      lastValueVisible: false,
+    });
+    chart.priceScale("volume").applyOptions({
+      scaleMargins: { top: 0.8, bottom: 0 },
+    });
+
     if (bars.length > 0) {
       candleSeries.setData(
         bars.map((b) => ({
@@ -105,6 +131,14 @@ export default function PriceChart({ bars, markers, smaPeriod = 9 }: Props) {
           high: b.high,
           low: b.low,
           close: b.close,
+        })),
+      );
+      volumeSeries.setData(
+        bars.map((b) => ({
+          time: b.time as Time,
+          value: b.volume,
+          // Tint volume bars by candle direction for a quick read.
+          color: b.close >= b.open ? "rgba(16, 185, 129, 0.5)" : "rgba(239, 68, 68, 0.5)",
         })),
       );
       const sma = computeSma(bars, smaPeriod);
@@ -172,7 +206,10 @@ export default function PriceChart({ bars, markers, smaPeriod = 9 }: Props) {
           <span className="inline-block h-1 w-3 bg-blue-600" /> SMA{smaPeriod}
         </span>
         <span className="inline-flex items-center gap-1">
-          <span className="inline-block h-1 w-3 bg-amber-500" /> VWAP
+          <span className="inline-block h-1 w-3 bg-amber-500" /> VWAP (resets each session)
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <span className="inline-block h-2 w-3 bg-gray-400 rounded-sm" /> volume
         </span>
         <span className="inline-flex items-center gap-1">▲ cross UP</span>
         <span className="inline-flex items-center gap-1">▼ cross DOWN</span>

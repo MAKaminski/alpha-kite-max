@@ -65,6 +65,7 @@ def _build_strategy(cfg: StrategyConfig):
             profit_target_pct=cfg.exit.profit_target_pct,
             stop_loss_pct=cfg.exit.stop_loss_pct,
             time_stop_minutes_before_close=cfg.exit.time_stop_minutes_before_close,
+            entry_delay_minutes_after_open=cfg.exit.entry_delay_minutes_after_open,
         )
     # default: bar strategy
     return BuyVolQQQCrossStrategy(
@@ -75,6 +76,7 @@ def _build_strategy(cfg: StrategyConfig):
         profit_target_pct=cfg.exit.profit_target_pct,
         stop_loss_pct=cfg.exit.stop_loss_pct,
         time_stop_minutes_before_close=cfg.exit.time_stop_minutes_before_close,
+        entry_delay_minutes_after_open=cfg.exit.entry_delay_minutes_after_open,
     )
 
 

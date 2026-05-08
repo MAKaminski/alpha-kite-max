@@ -80,6 +80,7 @@ class ExitConfig(_Strict):
     profit_target_pct: Decimal = Decimal("30")
     stop_loss_pct: Decimal = Decimal("25")
     time_stop_minutes_before_close: int = 30
+    entry_delay_minutes_after_open: int = 10
 
 
 class RiskConfig(_Strict):
