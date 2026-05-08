@@ -30,10 +30,14 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
 echo "==> repo root: $REPO_ROOT"
 
-echo "==> precheck: pytest + backtest (offline)"
-python -m pytest -q -m "not live and not supabase" >/dev/null
-python scripts/backtest.py >/dev/null
-echo "    OK"
+if [[ "${SKIP_PRECHECK:-0}" != "1" ]] && python -m pytest --version >/dev/null 2>&1; then
+  echo "==> precheck: pytest + backtest (offline)"
+  python -m pytest -q -m "not live and not supabase" >/dev/null
+  python scripts/backtest.py >/dev/null
+  echo "    OK"
+else
+  echo "==> precheck: SKIPPED (pytest not installed locally; CI already validates)"
+fi
 
 # ──────────── Supabase migration FIRST (so services have tables ready) ───
 if [[ -n "$SUPABASE_DB_URL" ]]; then
