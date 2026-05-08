@@ -158,67 +158,81 @@ async def run(cfg: StrategyConfig) -> None:
 
     heartbeat_task = asyncio.create_task(_heartbeat())
 
-    try:
-        async for bar in equity_feed.stream_equity_bars(
-            cfg.universe.symbol, cfg.data.bar_interval_seconds
-        ):
-            if stop_event.is_set():
+    async def _process_bar(bar) -> None:
+        nonlocal open_positions
+        await writer.write_bar(bar, feed=cfg.data.feed)
+        bar_history.append(bar)
+        account = await broker.get_account_summary()
+
+        chain = await options_feed.get_option_chain(
+            cfg.universe.symbol, bar.open_time.date()
+        )
+        quotes_iter = options_feed.stream_option_quotes(chain.contracts)
+        option_quotes = []
+        async for q in quotes_iter:
+            option_quotes.append(q)
+            if len(option_quotes) >= len(chain.contracts):
                 break
 
-            await writer.write_bar(bar, feed=cfg.data.feed)
-            bar_history.append(bar)
-            account = await broker.get_account_summary()
+        ctx = StrategyContext(
+            now=bar.open_time,
+            last_bar=bar,
+            bar_history=bar_history[-200:],
+            option_quotes=option_quotes,
+            open_positions=open_positions,
+            cash_available=account.cash,
+        )
 
-            chain = await options_feed.get_option_chain(
-                cfg.universe.symbol, bar.open_time.date()
-            )
-            quotes_iter = options_feed.stream_option_quotes(chain.contracts)
-            option_quotes = []
-            async for q in quotes_iter:
-                option_quotes.append(q)
-                if len(option_quotes) >= len(chain.contracts):
-                    break
+        decision: StrategyDecision = strategy.on_bar(ctx)
+        for sig in decision.signals:
+            await writer.write_signal(sig)
 
-            ctx = StrategyContext(
-                now=bar.open_time,
-                last_bar=bar,
-                bar_history=bar_history[-200:],
-                option_quotes=option_quotes,
+        for intent in decision.intents:
+            premium = _intent_premium(intent, option_quotes)
+            check: RiskCheck = risk.evaluate(
+                intent=intent,
+                account=account,
                 open_positions=open_positions,
-                cash_available=account.cash,
+                realized_pnl_today=realized_pnl_today,
+                last_premium=premium,
             )
+            await writer.write_order_intent(intent, dry_run=cfg.broker.dry_run)
+            if not check.allowed:
+                await _audit(writer, "risk", "RISK_BLOCK", "WARN",
+                             "intent blocked", payload={
+                                 "intent_id": str(intent.intent_id),
+                                 "reasons": check.reasons,
+                             })
+                continue
 
-            decision: StrategyDecision = strategy.on_bar(ctx)
-            for sig in decision.signals:
-                await writer.write_signal(sig)
+            update = await broker.place_order(intent)
+            await _audit(writer, "broker", "ORDER_PLACED", "INFO",
+                         f"placed {intent.side.value} {intent.symbol}",
+                         payload={"intent_id": str(intent.intent_id),
+                                  "status": update.status.value})
+            if update.filled_qty > 0:
+                open_positions += 1 if intent.side.name == "BUY" else -1
+                open_positions = max(open_positions, 0)
 
-            for intent in decision.intents:
-                # Pick a representative premium for the risk check
-                premium = _intent_premium(intent, option_quotes)
-                check: RiskCheck = risk.evaluate(
-                    intent=intent,
-                    account=account,
-                    open_positions=open_positions,
-                    realized_pnl_today=realized_pnl_today,
-                    last_premium=premium,
+    try:
+        # Outer loop: keep re-polling the feed when its inner stream exhausts.
+        # yfinance returns finite batches, so without this the engine would exit
+        # after the first batch. Sleep one bar interval between polls.
+        while not stop_event.is_set():
+            async for bar in equity_feed.stream_equity_bars(
+                cfg.universe.symbol, cfg.data.bar_interval_seconds
+            ):
+                if stop_event.is_set():
+                    break
+                await _process_bar(bar)
+            if stop_event.is_set():
+                break
+            try:
+                await asyncio.wait_for(
+                    stop_event.wait(), timeout=cfg.data.bar_interval_seconds
                 )
-                await writer.write_order_intent(intent, dry_run=cfg.broker.dry_run)
-                if not check.allowed:
-                    await _audit(writer, "risk", "RISK_BLOCK", "WARN",
-                                 "intent blocked", payload={
-                                     "intent_id": str(intent.intent_id),
-                                     "reasons": check.reasons,
-                                 })
-                    continue
-
-                update = await broker.place_order(intent)
-                await _audit(writer, "broker", "ORDER_PLACED", "INFO",
-                             f"placed {intent.side.value} {intent.symbol}",
-                             payload={"intent_id": str(intent.intent_id),
-                                      "status": update.status.value})
-                if update.filled_qty > 0:
-                    open_positions += 1 if intent.side.name == "BUY" else -1
-                    open_positions = max(open_positions, 0)
+            except TimeoutError:
+                pass
     finally:
         heartbeat_task.cancel()
         try:
