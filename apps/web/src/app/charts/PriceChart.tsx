@@ -16,6 +16,15 @@ interface Props {
   bars: ChartBar[];
   markers: ChartMarker[];
   smaPeriod?: number;
+  /** Trade-window bounds in minutes after midnight UTC (defaults: 13:40, 15:30 UTC = 09:40, 11:30 ET DST … i.e. 09:40 ET to 15:30 ET converted ⇒ 13:40, 19:30 UTC).  */
+  tradeWindowOpenUtcMin?: number;
+  tradeWindowCloseUtcMin?: number;
+}
+
+/** Minutes-since-midnight (UTC) for a unix-seconds timestamp. */
+function utcMinutesOfDay(unixSec: number): number {
+  const d = new Date(unixSec * 1000);
+  return d.getUTCHours() * 60 + d.getUTCMinutes();
 }
 
 /** Trailing simple moving average over bar closes. */
@@ -60,7 +69,17 @@ function computeVwap(bars: ChartBar[]): { time: number; value: number }[] {
   });
 }
 
-export default function PriceChart({ bars, markers, smaPeriod = 9 }: Props) {
+export default function PriceChart({
+  bars,
+  markers,
+  smaPeriod = 9,
+  // 09:40 ET = 13:40 UTC during DST; 15:30 ET = 19:30 UTC during DST.
+  // We approximate ET via these UTC bounds; the engine's own gate is the
+  // source of truth — this is just a chart-side cosmetic filter so legacy
+  // signals from before the gate don't pollute the view.
+  tradeWindowOpenUtcMin = 13 * 60 + 40,
+  tradeWindowCloseUtcMin = 19 * 60 + 30,
+}: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
 
@@ -146,7 +165,22 @@ export default function PriceChart({ bars, markers, smaPeriod = 9 }: Props) {
       const vwap = computeVwap(bars);
       vwapSeries.setData(vwap.map((s) => ({ time: s.time as Time, value: s.value })));
 
-      const tvMarkers: SeriesMarker<Time>[] = markers.map((m) => {
+      // Drop markers that fall outside the live trade window OR before
+      // SMA9 has enough samples to plot. Both conditions guarantee the
+      // signal couldn't have been a "live" entry — leftover rows from
+      // earlier (un-gated) builds get hidden so the chart matches what
+      // the strategy will actually fire from now on.
+      const firstSmaTime = bars.length >= smaPeriod ? bars[smaPeriod - 1].time : null;
+      const isLiveMarker = (m: ChartMarker): boolean => {
+        if (firstSmaTime !== null && m.time < firstSmaTime) return false;
+        const minOfDay = utcMinutesOfDay(m.time);
+        if (minOfDay < tradeWindowOpenUtcMin) return false;
+        if (minOfDay >= tradeWindowCloseUtcMin) return false;
+        return true;
+      };
+      const visibleMarkers = markers.filter(isLiveMarker);
+
+      const tvMarkers: SeriesMarker<Time>[] = visibleMarkers.map((m) => {
         switch (m.kind) {
           case "signal_up":
             return {
@@ -190,7 +224,7 @@ export default function PriceChart({ bars, markers, smaPeriod = 9 }: Props) {
       chart.remove();
       chartRef.current = null;
     };
-  }, [bars, markers, smaPeriod]);
+  }, [bars, markers, smaPeriod, tradeWindowOpenUtcMin, tradeWindowCloseUtcMin]);
 
   return (
     <div className="relative">

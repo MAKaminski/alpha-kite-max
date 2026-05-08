@@ -179,13 +179,37 @@ async def run(cfg: StrategyConfig) -> None:
     posix_signal.signal(posix_signal.SIGTERM, _on_signal)
 
     # Background heartbeat so the /status page shows the engine alive even
-    # outside market hours when the bar stream is silent.
+    # outside market hours when the bar stream is silent. Also writes a
+    # BROKER_HEARTBEAT row containing the latest IBKR account snapshot
+    # (account id, NAV, cash, buying power) so the dashboard can render
+    # portfolio balance + connection state.
     async def _heartbeat() -> None:
         while not stop_event.is_set():
             await _audit(writer, "engine", "HEARTBEAT", "INFO",
                          "engine alive",
                          payload={"feed": cfg.data.feed,
                                   "dry_run": cfg.broker.dry_run})
+            try:
+                acct = await broker.get_account_summary()
+                await _audit(
+                    writer, "broker", "BROKER_HEARTBEAT", "INFO",
+                    "ibkr account snapshot",
+                    payload={
+                        "account_id": acct.account_id,
+                        "broker_mode": cfg.broker.mode,
+                        "dry_run": cfg.broker.dry_run,
+                        "nav": str(acct.nav),
+                        "cash": str(acct.cash),
+                        "buying_power": str(acct.buying_power),
+                        "connected": True,
+                    },
+                )
+            except Exception as exc:
+                await _audit(
+                    writer, "broker", "BROKER_ERROR", "WARN",
+                    f"account_summary failed: {exc}",
+                    payload={"connected": False, "error": str(exc)},
+                )
             try:
                 await asyncio.wait_for(stop_event.wait(), timeout=60)
             except TimeoutError:

@@ -159,6 +159,80 @@ export async function fetchChartMarkers(
   return markers;
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Broker / account snapshot — read by /status (IBKR connection row) and
+// /charts (portfolio balance card). Source of truth is the latest
+// BROKER_HEARTBEAT audit row written by the strategy engine every 60 s.
+// ─────────────────────────────────────────────────────────────────────────
+
+export interface BrokerSnapshot {
+  accountId: string | null;
+  brokerMode: string | null;     // "paper" | "live"
+  dryRun: boolean | null;
+  navUsd: string | null;
+  cashUsd: string | null;
+  buyingPowerUsd: string | null;
+  connected: boolean | null;
+  lastError: string | null;
+  lastSeen: string | null;       // ISO timestamp
+  severity: AuditSeverity | null;
+}
+
+export async function fetchBrokerSnapshot(): Promise<BrokerSnapshot> {
+  const empty: BrokerSnapshot = {
+    accountId: null,
+    brokerMode: null,
+    dryRun: null,
+    navUsd: null,
+    cashUsd: null,
+    buyingPowerUsd: null,
+    connected: null,
+    lastError: null,
+    lastSeen: null,
+    severity: null,
+  };
+  const supabase = getSupabase();
+  if (!supabase) return empty;
+  const { data, error } = await supabase
+    .from("audit_log")
+    .select("ts,event_type,severity,message,payload")
+    .in("event_type", ["BROKER_HEARTBEAT", "BROKER_ERROR"])
+    .order("ts", { ascending: false })
+    .limit(1);
+  if (error || !data || data.length === 0) return empty;
+  const row = data[0] as {
+    ts: string;
+    event_type: string;
+    severity: string;
+    message: string;
+    payload: Record<string, unknown> | null;
+  };
+  const p = row.payload ?? {};
+  const get = (k: string): string | null => {
+    const v = p[k];
+    if (v === null || v === undefined) return null;
+    return typeof v === "string" ? v : String(v);
+  };
+  return {
+    accountId: get("account_id"),
+    brokerMode: get("broker_mode"),
+    dryRun: typeof p["dry_run"] === "boolean" ? (p["dry_run"] as boolean) : null,
+    navUsd: get("nav"),
+    cashUsd: get("cash"),
+    buyingPowerUsd: get("buying_power"),
+    connected:
+      typeof p["connected"] === "boolean"
+        ? (p["connected"] as boolean)
+        : row.event_type === "BROKER_HEARTBEAT",
+    lastError: row.event_type === "BROKER_ERROR" ? (get("error") ?? row.message) : null,
+    lastSeen: row.ts,
+    severity:
+      row.severity === "INFO" || row.severity === "WARN" || row.severity === "ERROR"
+        ? (row.severity as AuditSeverity)
+        : "INFO",
+  };
+}
+
 export async function fetchChartDailyPnl(daysBack = 30): Promise<DayPnl[]> {
   const supabase = getSupabase();
   if (!supabase) return [];
@@ -489,6 +563,7 @@ export async function fetchSystemStatus(): Promise<SystemStatus> {
     latestSignal,
     latestFill,
     killSwitchEvent,
+    brokerSnap,
   ] = await Promise.all([
     fetchLatestTs("audit_log", "ts", { col: "actor",      eq: "engine" }),
     fetchLatestTs("audit_log", "ts", { col: "actor",      eq: "market_data_stream" }),
@@ -496,6 +571,7 @@ export async function fetchSystemStatus(): Promise<SystemStatus> {
     fetchLatestTs("signals",   "ts"),
     fetchLatestTs("fills",     "ts"),
     fetchLatestTs("audit_log", "ts", { col: "event_type", eq: "KILL_SWITCH" }),
+    fetchBrokerSnapshot(),
   ]);
 
   // Engine: heartbeat every 60s; healthy if seen in 2 min, stale 10 min, else down.
@@ -546,6 +622,24 @@ export async function fetchSystemStatus(): Promise<SystemStatus> {
         lastSeen: latestFill,
         cadence: "After every signal that passes risk checks",
         detail: latestFill ? "Most recent broker fill recorded." : "No fills yet — engine is in dry-run.",
+      },
+      {
+        name: "IBKR gateway",
+        // Healthy if a BROKER_HEARTBEAT landed inside the last 5 min and
+        // payload.connected was true. Anything older or a BROKER_ERROR
+        // demotes the row.
+        health: brokerSnap.lastSeen
+          ? brokerSnap.connected
+            ? classifyFreshness(brokerSnap.lastSeen, 300, 1800)
+            : "down"
+          : "unknown",
+        lastSeen: brokerSnap.lastSeen,
+        cadence: "Heartbeat every 60s",
+        detail: brokerSnap.lastError
+          ? `IBKR error: ${brokerSnap.lastError}`
+          : brokerSnap.accountId
+            ? `Connected to ${brokerSnap.accountId} (${brokerSnap.brokerMode ?? "paper"})${brokerSnap.dryRun ? " · dry-run" : ""}`
+            : "Awaiting first broker heartbeat from the engine.",
       },
       {
         name: "Kill switch",

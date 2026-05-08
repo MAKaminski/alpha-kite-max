@@ -76,6 +76,16 @@ function freshen(components: ComponentStatus[], now: number): ComponentStatus[] 
         health: c.lastSeen ? classifyAge(c.lastSeen, 3600, 86_400, now) : "unknown",
       };
     }
+    if (c.name === "IBKR gateway") {
+      // Server already encoded the connected/down distinction in the
+      // initial health; we only relax it on age. If the snapshot was an
+      // explicit "down", keep it.
+      if (c.health === "down") return c;
+      return {
+        ...c,
+        health: c.lastSeen ? classifyAge(c.lastSeen, 300, 1800, now) : "unknown",
+      };
+    }
     return c;
   });
 }
@@ -112,6 +122,9 @@ export default function LiveStatusTable({ initial, supabaseUrl, supabaseAnonKey 
           const row = payload.new as { actor: string; ts: string; event_type: string };
           if (row.actor === "engine") updateRow("Strategy engine", row.ts);
           if (row.actor === "market_data_stream") updateRow("Market-data stream", row.ts);
+          if (row.event_type === "BROKER_HEARTBEAT" || row.event_type === "BROKER_ERROR") {
+            updateRow("IBKR gateway", row.ts);
+          }
         },
       )
       .on(
