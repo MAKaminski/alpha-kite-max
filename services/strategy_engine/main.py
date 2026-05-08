@@ -36,6 +36,7 @@ from engine.risk.limits import (
 from engine.risk.paper_guard import PaperAccountGuard
 from engine.risk.pipeline import RiskPipeline
 from engine.strategies.buy_vol_qqq_cross import BuyVolQQQCrossStrategy
+from engine.strategies.buy_vol_qqq_cross_tick import BuyVolQQQCrossTickStrategy
 
 from services.persistence.models import AuditEvent
 from services.persistence.storage import InMemoryBackend, StorageBackend, SupabaseBackend
@@ -50,6 +51,31 @@ def _build_storage() -> StorageBackend:
         return SupabaseBackend(os.environ["SUPABASE_DB_URL"])
     LOG.warning("SUPABASE_DB_URL unset; using in-memory persistence (no durability)")
     return InMemoryBackend()
+
+
+def _build_strategy(cfg: StrategyConfig):
+    """Select bar-vs-tick strategy based on signal.name in config."""
+    if cfg.signal.name == "sma_vwap_cross_tick":
+        return BuyVolQQQCrossTickStrategy(
+            symbol=cfg.universe.symbol,
+            sma_window_seconds=cfg.signal.params.sma_window_seconds,
+            confirmation_seconds=cfg.signal.params.confirmation_seconds,
+            mode=cfg.entry.mode,
+            contracts=cfg.entry.contracts,
+            profit_target_pct=cfg.exit.profit_target_pct,
+            stop_loss_pct=cfg.exit.stop_loss_pct,
+            time_stop_minutes_before_close=cfg.exit.time_stop_minutes_before_close,
+        )
+    # default: bar strategy
+    return BuyVolQQQCrossStrategy(
+        symbol=cfg.universe.symbol,
+        sma_period=cfg.signal.params.sma_period,
+        mode=cfg.entry.mode,
+        contracts=cfg.entry.contracts,
+        profit_target_pct=cfg.exit.profit_target_pct,
+        stop_loss_pct=cfg.exit.stop_loss_pct,
+        time_stop_minutes_before_close=cfg.exit.time_stop_minutes_before_close,
+    )
 
 
 def _build_broker(cfg: StrategyConfig):
@@ -111,15 +137,7 @@ async def run(cfg: StrategyConfig) -> None:
 
     equity_feed = make_feed(cfg.data)
     options_feed = make_options_feed(cfg.data, equity_feed)
-    strategy = BuyVolQQQCrossStrategy(
-        symbol=cfg.universe.symbol,
-        sma_period=cfg.signal.params.sma_period,
-        mode=cfg.entry.mode,
-        contracts=cfg.entry.contracts,
-        profit_target_pct=cfg.exit.profit_target_pct,
-        stop_loss_pct=cfg.exit.stop_loss_pct,
-        time_stop_minutes_before_close=cfg.exit.time_stop_minutes_before_close,
-    )
+    strategy = _build_strategy(cfg)
     risk = _build_risk_pipeline(cfg)
     broker = _build_broker(cfg)
     await broker.connect()
@@ -214,17 +232,90 @@ async def run(cfg: StrategyConfig) -> None:
                 open_positions += 1 if intent.side.name == "BUY" else -1
                 open_positions = max(open_positions, 0)
 
+    async def _process_tick(quote) -> None:
+        """Tick path: feed each NBBO to strategy.on_tick and process emissions."""
+        nonlocal open_positions
+        await writer.write_tick(quote, feed=cfg.data.feed)
+        account = await broker.get_account_summary()
+
+        # Pull current option chain ATM ±2 every N seconds (cheap once cached
+        # by the IBKR feed). For now, refresh on every tick — the IBKRLiveFeed
+        # handles caching internally; replay/yfinance feeds skip via early
+        # return on empty chains.
+        try:
+            chain = await options_feed.get_option_chain(
+                cfg.universe.symbol, quote.timestamp.date()
+            )
+        except Exception:
+            chain = None
+
+        option_quotes: list = []
+        if chain and chain.contracts:
+            quotes_iter = options_feed.stream_option_quotes(chain.contracts)
+            try:
+                # Drain just one snapshot per contract
+                async for q in quotes_iter:
+                    option_quotes.append(q)
+                    if len(option_quotes) >= len(chain.contracts):
+                        break
+            except Exception:
+                pass
+
+        ctx = StrategyContext(
+            now=quote.timestamp,
+            last_tick=quote,
+            option_quotes=option_quotes,
+            open_positions=open_positions,
+            cash_available=account.cash,
+        )
+
+        decision: StrategyDecision = strategy.on_tick(ctx)
+        for sig in decision.signals:
+            await writer.write_signal(sig)
+
+        for intent in decision.intents:
+            premium = _intent_premium(intent, option_quotes)
+            check: RiskCheck = risk.evaluate(
+                intent=intent,
+                account=account,
+                open_positions=open_positions,
+                realized_pnl_today=realized_pnl_today,
+                last_premium=premium,
+            )
+            await writer.write_order_intent(intent, dry_run=cfg.broker.dry_run)
+            if not check.allowed:
+                await _audit(writer, "risk", "RISK_BLOCK", "WARN",
+                             "intent blocked", payload={
+                                 "intent_id": str(intent.intent_id),
+                                 "reasons": check.reasons,
+                             })
+                continue
+            update = await broker.place_order(intent)
+            await _audit(writer, "broker", "ORDER_PLACED", "INFO",
+                         f"placed {intent.side.value} {intent.symbol}",
+                         payload={"intent_id": str(intent.intent_id),
+                                  "status": update.status.value})
+            if update.filled_qty > 0:
+                open_positions += 1 if intent.side.name == "BUY" else -1
+                open_positions = max(open_positions, 0)
+
     try:
-        # Outer loop: keep re-polling the feed when its inner stream exhausts.
-        # yfinance returns finite batches, so without this the engine would exit
-        # after the first batch. Sleep one bar interval between polls.
+        # Branch on strategy kind. Bar strategies consume bar streams; tick
+        # strategies consume quote streams. Outer while-loop keeps the engine
+        # alive when an inner stream exhausts (yfinance returns finite batches).
         while not stop_event.is_set():
-            async for bar in equity_feed.stream_equity_bars(
-                cfg.universe.symbol, cfg.data.bar_interval_seconds
-            ):
-                if stop_event.is_set():
-                    break
-                await _process_bar(bar)
+            if getattr(strategy, "kind", "bar") == "tick":
+                async for quote in equity_feed.stream_equity_quotes(cfg.universe.symbol):
+                    if stop_event.is_set():
+                        break
+                    await _process_tick(quote)
+            else:
+                async for bar in equity_feed.stream_equity_bars(
+                    cfg.universe.symbol, cfg.data.bar_interval_seconds
+                ):
+                    if stop_event.is_set():
+                        break
+                    await _process_bar(bar)
             if stop_event.is_set():
                 break
             try:

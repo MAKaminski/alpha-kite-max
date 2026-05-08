@@ -42,9 +42,10 @@ def test_make_feed_synthetic_options() -> None:
     assert isinstance(feed, SyntheticOptionsFeed)
 
 
-def test_make_feed_ibkr_live_raises_not_implemented() -> None:
-    with pytest.raises(NotImplementedError):
-        make_feed(DataConfig(feed="ibkr_live"))
+def test_make_feed_ibkr_live_returns_live_feed() -> None:
+    from engine.data_feeds.ibkr_live import IBKRLiveFeed
+    feed = make_feed(DataConfig(feed="ibkr_live"))
+    assert isinstance(feed, IBKRLiveFeed)
 
 
 def test_make_options_feed_synthetic() -> None:
@@ -53,7 +54,17 @@ def test_make_options_feed_synthetic() -> None:
     assert isinstance(options, SyntheticOptionsFeed)
 
 
-def test_make_options_feed_ibkr_live_raises() -> None:
+def test_make_options_feed_ibkr_live_returns_live_feed() -> None:
+    from engine.data_feeds.ibkr_live import IBKRLiveFeed
     equity = YFinanceFeed()
-    with pytest.raises(NotImplementedError):
-        make_options_feed(DataConfig(options_feed="ibkr_live"), equity)
+    options = make_options_feed(DataConfig(options_feed="ibkr_live"), equity)
+    assert isinstance(options, IBKRLiveFeed)
+
+
+def test_make_options_feed_ibkr_live_reuses_equity_feed() -> None:
+    """When equity feed is already IBKRLive, options feed should be the SAME instance
+    so we share one IB connection."""
+    from engine.data_feeds.ibkr_live import IBKRLiveFeed
+    equity = IBKRLiveFeed()
+    options = make_options_feed(DataConfig(options_feed="ibkr_live"), equity)
+    assert options is equity

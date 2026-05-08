@@ -6,6 +6,7 @@ from config.schema import DataConfig
 from contracts.data_feed import MarketDataFeed
 
 from engine.data_feeds.ibkr_delayed import IBKRDelayedFeed
+from engine.data_feeds.ibkr_live import IBKRLiveFeed
 from engine.data_feeds.replay import ReplayFeed
 from engine.data_feeds.synthetic_options import SyntheticOptionsFeed
 from engine.data_feeds.yfinance import YFinanceFeed
@@ -25,9 +26,7 @@ def make_feed(config: DataConfig) -> MarketDataFeed:
     if feed == "synthetic_options":
         return SyntheticOptionsFeed(YFinanceFeed())
     if feed == "ibkr_live":
-        raise NotImplementedError(
-            "ibkr_live feed deferred to Phase 3 — see roadmap"
-        )
+        return IBKRLiveFeed()
     raise ValueError(f"unknown feed: {feed!r}")  # pragma: no cover - Literal exhaustive
 
 
@@ -42,9 +41,11 @@ def make_options_feed(
     if options_feed == "synthetic":
         return SyntheticOptionsFeed(equity_feed)
     if options_feed == "ibkr_live":
-        raise NotImplementedError(
-            "ibkr_live options feed deferred to Phase 3 — see roadmap"
-        )
+        # If the equity feed is already IBKRLiveFeed, reuse it so we share
+        # one IB connection (avoids "duplicate clientId" errors).
+        if isinstance(equity_feed, IBKRLiveFeed):
+            return equity_feed
+        return IBKRLiveFeed()
     raise ValueError(  # pragma: no cover - Literal exhaustive
         f"unknown options_feed: {options_feed!r}"
     )
