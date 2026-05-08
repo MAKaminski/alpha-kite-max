@@ -155,11 +155,6 @@ else
   fi
 fi
 
-if ! railway status 2>/dev/null | grep -qi 'project'; then
-  echo "==> Railway: init project alpha-kite-v2"
-  railway init --name alpha-kite-v2
-fi
-
 deploy_service() {
   local svc="$1"
   local dockerfile="$2"
