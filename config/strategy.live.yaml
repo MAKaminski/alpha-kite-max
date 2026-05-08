@@ -19,7 +19,7 @@ broker:
   name: ibkr
   mode: paper
   host: ibkr-gateway.railway.internal   # Railway private DNS
-  port: 7497
+  port: 4002                             # IB Gateway paper port (gnzsnz image)
   client_id: 17
   dry_run: true                          # KEEP TRUE during the first session
   # IBKR paper accounts start with DU; the existing PaperAccountGuard already
