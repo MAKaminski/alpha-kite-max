@@ -21,6 +21,8 @@ dependencies = [
     "supabase>=2.5",
     "asyncpg>=0.29",
     "uvloop>=0.19; sys_platform != 'win32'",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
 ]
 
 [project.optional-dependencies]

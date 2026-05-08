@@ -1,13 +1,22 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
-import type { ChartBar, ChartMarker, DayPnl } from "@/lib/queries";
+import {
+  KNOWN_STRATEGIES,
+  type ChartBar,
+  type ChartMarker,
+  type DayPnl,
+  type StrategyId,
+} from "@/lib/queries";
 import PriceChart from "./PriceChart";
 import DailyPnlChart from "./DailyPnlChart";
 
 interface Props {
   symbol: string;
+  availableSymbols: string[];
+  activeStrategy: StrategyId;
   initialDay: string;
   initialBars: ChartBar[];
   initialMarkers: ChartMarker[];
@@ -23,6 +32,8 @@ type Mode = "day" | "range";
 
 export default function ChartView({
   symbol,
+  availableSymbols,
+  activeStrategy,
   initialDay,
   initialBars,
   initialMarkers,
@@ -30,6 +41,7 @@ export default function ChartView({
   supabaseUrl,
   supabaseAnonKey,
 }: Props) {
+  const router = useRouter();
   const [mode, setMode] = useState<Mode>("day");
   const [day, setDay] = useState(initialDay);
   const [fromDay, setFromDay] = useState(initialDay);
@@ -177,9 +189,45 @@ export default function ChartView({
         ? fromDay
         : `${fromDay} → ${toDay} (${dayCount} days)`;
 
+  const updateSearchParam = (key: string, value: string) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set(key, value);
+    router.push(`${url.pathname}?${url.searchParams.toString()}`);
+  };
+
   return (
     <div className="space-y-8">
       <section>
+        <div className="mb-3 flex flex-wrap items-end gap-3">
+          <label className="flex flex-col gap-1 text-xs text-gray-600">
+            Symbol
+            <select
+              value={symbol}
+              onChange={(e) => updateSearchParam("symbol", e.target.value)}
+              className="rounded-md border border-gray-300 px-2 py-1 text-sm font-mono text-gray-900"
+            >
+              {availableSymbols.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-gray-600">
+            Strategy
+            <select
+              value={activeStrategy}
+              onChange={(e) => updateSearchParam("strategy", e.target.value)}
+              className="rounded-md border border-gray-300 px-2 py-1 text-sm text-gray-900"
+              title="Read-only until live strategy switching ships (Stream E)"
+            >
+              {KNOWN_STRATEGIES.map((s) => (
+                <option key={s.id} value={s.id}>{s.label}</option>
+              ))}
+            </select>
+          </label>
+          <span className="pb-1 text-[10px] uppercase tracking-wider text-gray-400">
+            (read-only — engine reads strategy from config/strategy.yaml)
+          </span>
+        </div>
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-xl font-semibold text-gray-900">

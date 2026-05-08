@@ -37,6 +37,12 @@ from engine.risk.paper_guard import PaperAccountGuard
 from engine.risk.pipeline import RiskPipeline
 from engine.strategies.buy_vol_qqq_cross import BuyVolQQQCrossStrategy
 from engine.strategies.buy_vol_qqq_cross_tick import BuyVolQQQCrossTickStrategy
+from engine.strategies.sell_put_qqq_cross import (
+    SellPutQQQCrossStrategy,
+)
+from engine.strategies.sell_put_qqq_cross import (
+    TakeProfitTier as TickTakeProfitTier,
+)
 
 from services.persistence.models import AuditEvent
 from services.persistence.storage import InMemoryBackend, StorageBackend, SupabaseBackend
@@ -54,7 +60,32 @@ def _build_storage() -> StorageBackend:
 
 
 def _build_strategy(cfg: StrategyConfig):
-    """Select bar-vs-tick strategy based on signal.name in config."""
+    """Select strategy implementation based on signal.name in config."""
+    if cfg.signal.name == "sell_put_qqq_cross":
+        tiers_cfg = cfg.exit.tiers
+        if tiers_cfg is None:
+            # Use the strategy's built-in user-spec ladder.
+            tier_objs = None
+            stop_mult = None
+        else:
+            tier_objs = [
+                TickTakeProfitTier(gain_pct=t.gain_pct, qty_fraction=t.qty_fraction)
+                for t in tiers_cfg.take_profit_tiers
+            ]
+            stop_mult = tiers_cfg.stop_loss_multiple
+        kwargs: dict = dict(
+            symbol=cfg.universe.symbol,
+            sma_window_seconds=cfg.signal.params.sma_window_seconds,
+            cooldown_seconds=cfg.signal.params.cooldown_seconds,
+            contracts=cfg.entry.contracts,
+            time_stop_minutes_before_close=cfg.exit.time_stop_minutes_before_close,
+            entry_delay_minutes_after_open=cfg.exit.entry_delay_minutes_after_open,
+        )
+        if tier_objs is not None:
+            kwargs["take_profit_tiers"] = tier_objs
+        if stop_mult is not None:
+            kwargs["stop_loss_multiple"] = stop_mult
+        return SellPutQQQCrossStrategy(**kwargs)
     if cfg.signal.name == "sma_vwap_cross_tick":
         return BuyVolQQQCrossTickStrategy(
             symbol=cfg.universe.symbol,
@@ -178,17 +209,60 @@ async def run(cfg: StrategyConfig) -> None:
     posix_signal.signal(posix_signal.SIGINT, _on_signal)
     posix_signal.signal(posix_signal.SIGTERM, _on_signal)
 
+    # Effective dry_run flag — starts at the YAML-configured value and is
+    # overlaid each heartbeat with whatever the dashboard has set in the
+    # runtime_settings.dry_run_override row (migration 0004). Letting the
+    # operator flip broker.dry_run without redeploying is the whole point
+    # of /live-enable.
+    effective_dry_run = cfg.broker.dry_run
+
+    async def _read_dry_run_override() -> bool | None:
+        """Return the latest runtime_settings.dry_run_override.value, or None."""
+        if not isinstance(storage, SupabaseBackend):
+            return None
+        try:
+            rows = await storage.select(
+                "runtime_settings", where={"key": "dry_run_override"}, limit=1,
+            )
+        except Exception as exc:
+            LOG.warning("runtime_settings read failed: %s", exc)
+            return None
+        if not rows:
+            return None
+        v = rows[0].get("value")
+        if isinstance(v, dict) and isinstance(v.get("value"), bool):
+            return bool(v["value"])
+        return None
+
     # Background heartbeat so the /status page shows the engine alive even
     # outside market hours when the bar stream is silent. Also writes a
     # BROKER_HEARTBEAT row containing the latest IBKR account snapshot
     # (account id, NAV, cash, buying power) so the dashboard can render
     # portfolio balance + connection state.
     async def _heartbeat() -> None:
+        nonlocal effective_dry_run
         while not stop_event.is_set():
+            override = await _read_dry_run_override()
+            if override is not None and override != effective_dry_run:
+                LOG.info(
+                    "dry_run flipped via runtime_settings: %s -> %s",
+                    effective_dry_run, override,
+                )
+                effective_dry_run = override
+                # Tell the broker too — IBKRPaperBroker honors dry_run on every
+                # place_order; toggling the attribute is enough for v1.
+                if hasattr(broker, "dry_run"):
+                    broker.dry_run = override   # type: ignore[attr-defined]
+                await _audit(
+                    writer, "engine", "DRY_RUN_FLIPPED", "WARN",
+                    f"dry_run override applied: {override}",
+                    payload={"new_value": override, "yaml_default": cfg.broker.dry_run},
+                )
+
             await _audit(writer, "engine", "HEARTBEAT", "INFO",
                          "engine alive",
                          payload={"feed": cfg.data.feed,
-                                  "dry_run": cfg.broker.dry_run})
+                                  "dry_run": effective_dry_run})
             try:
                 acct = await broker.get_account_summary()
                 await _audit(
@@ -197,7 +271,7 @@ async def run(cfg: StrategyConfig) -> None:
                     payload={
                         "account_id": acct.account_id,
                         "broker_mode": cfg.broker.mode,
-                        "dry_run": cfg.broker.dry_run,
+                        "dry_run": effective_dry_run,
                         "nav": str(acct.nav),
                         "cash": str(acct.cash),
                         "buying_power": str(acct.buying_power),
@@ -255,7 +329,7 @@ async def run(cfg: StrategyConfig) -> None:
                 realized_pnl_today=realized_pnl_today,
                 last_premium=premium,
             )
-            await writer.write_order_intent(intent, dry_run=cfg.broker.dry_run)
+            await writer.write_order_intent(intent, dry_run=effective_dry_run)
             if not check.allowed:
                 await _audit(writer, "risk", "RISK_BLOCK", "WARN",
                              "intent blocked", payload={
@@ -323,7 +397,7 @@ async def run(cfg: StrategyConfig) -> None:
                 realized_pnl_today=realized_pnl_today,
                 last_premium=premium,
             )
-            await writer.write_order_intent(intent, dry_run=cfg.broker.dry_run)
+            await writer.write_order_intent(intent, dry_run=effective_dry_run)
             if not check.allowed:
                 await _audit(writer, "risk", "RISK_BLOCK", "WARN",
                              "intent blocked", payload={

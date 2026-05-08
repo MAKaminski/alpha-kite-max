@@ -61,11 +61,44 @@ class SignalParams(_Strict):
     # Tick-strategy params (ignored by bar strategy)
     sma_window_seconds: int = 9
     confirmation_seconds: int = 5
+    # Sell-put strategy: minimum wall-clock between consecutive signals.
+    cooldown_seconds: int = 30
 
 
 class SignalConfig(_Strict):
-    name: Literal["sma_vwap_cross", "sma_vwap_cross_tick"] = "sma_vwap_cross"
+    name: Literal[
+        "sma_vwap_cross",
+        "sma_vwap_cross_tick",
+        "sell_put_qqq_cross",
+    ] = "sma_vwap_cross"
     params: SignalParams = Field(default_factory=SignalParams)
+
+
+class TakeProfitTier(_Strict):
+    """One step of the scale-out ladder used by short-option strategies."""
+
+    gain_pct: Decimal             # close when option price has dropped this %
+    qty_fraction: Decimal         # fraction of original entry qty to close
+
+
+def _default_tp_tiers() -> list[TakeProfitTier]:
+    return [
+        TakeProfitTier(gain_pct=Decimal("25"), qty_fraction=Decimal("0.25")),
+        TakeProfitTier(gain_pct=Decimal("50"), qty_fraction=Decimal("0.25")),
+        TakeProfitTier(gain_pct=Decimal("100"), qty_fraction=Decimal("0.25")),
+    ]
+
+
+class ExitTiersConfig(_Strict):
+    """Tiered scale-out + multiplicative stop-loss for short-option strategies.
+
+    None of the long-vol strategies use this — they keep the legacy
+    profit_target_pct / stop_loss_pct. Set this only when running
+    ``signal.name=sell_put_qqq_cross`` (or any future short-option strategy).
+    """
+
+    stop_loss_multiple: Decimal = Decimal("2.0")
+    take_profit_tiers: list[TakeProfitTier] = Field(default_factory=_default_tp_tiers)
 
 
 class EntryConfig(_Strict):
@@ -81,6 +114,9 @@ class ExitConfig(_Strict):
     stop_loss_pct: Decimal = Decimal("25")
     time_stop_minutes_before_close: int = 30
     entry_delay_minutes_after_open: int = 10
+    # Set only when running a short-option strategy (e.g. sell_put_qqq_cross).
+    # Long-vol strategies ignore this and use profit_target_pct/stop_loss_pct.
+    tiers: ExitTiersConfig | None = None
 
 
 class RiskConfig(_Strict):

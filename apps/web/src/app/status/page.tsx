@@ -1,6 +1,7 @@
-import { fetchSystemStatus } from "@/lib/queries";
+import { fetchRecentBars, fetchSystemStatus } from "@/lib/queries";
 import { Nav } from "@/components/Nav";
 import LiveStatusTable from "./LiveStatusTable";
+import LiveFeedPanel from "./LiveFeedPanel";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -10,7 +11,10 @@ export default async function StatusPage() {
   // client component which (a) ticks "X seconds ago" labels every second and
   // (b) subscribes to Supabase Realtime for INSERT events on audit_log /
   // bars / signals / fills so the page updates the moment new rows land.
-  const initial = await fetchSystemStatus();
+  const [initial, recentBars] = await Promise.all([
+    fetchSystemStatus(),
+    fetchRecentBars(10),
+  ]);
 
   // Anon key is safe to expose; only allows row-level access already guarded
   // by RLS read policies.
@@ -20,14 +24,20 @@ export default async function StatusPage() {
   return (
     <div>
       <Nav current="/status" />
-      <main className="mx-auto max-w-5xl px-4 py-8">
+      <main className="mx-auto max-w-5xl px-4 py-8 space-y-6">
         <LiveStatusTable
           initial={initial}
           supabaseUrl={supabaseUrl}
           supabaseAnonKey={supabaseAnonKey}
         />
 
-        <div className="mt-6 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+        <LiveFeedPanel
+          initial={recentBars}
+          supabaseUrl={supabaseUrl}
+          supabaseAnonKey={supabaseAnonKey}
+        />
+
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
           <h2 className="mb-2 font-medium text-gray-900">How to read this page</h2>
           <ul className="space-y-1 text-xs">
             <li>

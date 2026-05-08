@@ -9,8 +9,12 @@ const LINKS: ReadonlyArray<{ href: string; label: string }> = [
   { href: "/status", label: "Status" },
   { href: "/charts", label: "Charts" },
   { href: "/signals", label: "Signals" },
+  { href: "/orders", label: "Orders" },
   { href: "/positions", label: "Positions" },
   { href: "/pnl", label: "P&L" },
+  { href: "/risk", label: "Risk" },
+  { href: "/backtest", label: "Backtest" },
+  { href: "/live-enable", label: "Live enable" },
   { href: "/audit", label: "Audit" },
 ];
 

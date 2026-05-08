@@ -531,6 +531,310 @@ export async function fetchDailyPnl(limit = 30): Promise<DailyPnl[]> {
 // daily-P&L row and see every individual buy/sell with its timestamp.
 // ─────────────────────────────────────────────────────────────────────────
 
+// ─────────────────────────────────────────────────────────────────────────
+// /orders view — order_intents joined to fills (1:N) and to RISK_BLOCK
+// audit rows (intent_id in payload) so each row shows queued / blocked /
+// placed / filled state.
+// ─────────────────────────────────────────────────────────────────────────
+
+export type OrderStatus = "filled" | "placed" | "blocked" | "dry-run" | "queued";
+
+export interface OrderIntentRecord {
+  intentId: string;
+  createdAt: string;
+  symbol: string;
+  isOption: boolean;
+  optionExpiry: string | null;
+  optionStrike: string | null;
+  optionRight: string | null;
+  side: string;
+  quantity: number;
+  orderType: string;
+  limitPrice: string | null;
+  dryRun: boolean;
+  submitted: boolean;
+  brokerOrderId: string | null;
+  tag: string;
+  fills: { ts: string; quantity: number; price: string }[];
+  blockReasons: string[];
+  status: OrderStatus;
+}
+
+export async function fetchOrderIntents(limit = 50): Promise<OrderIntentRecord[]> {
+  const supa = getSupabase();
+  if (!supa) return [];
+
+  const { data: intentRows, error } = await supa
+    .from("order_intents")
+    .select(
+      "intent_id,created_at,symbol,is_option,option_expiry,option_strike,option_right,side,quantity,order_type,limit_price,dry_run,submitted,broker_order_id,tag",
+    )
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error || !intentRows || intentRows.length === 0) return [];
+
+  const intentIds = (intentRows as Array<{ intent_id: string }>).map(
+    (r) => r.intent_id,
+  );
+
+  const [fillsRes, riskRes] = await Promise.all([
+    supa
+      .from("fills")
+      .select("intent_id,ts,quantity,price")
+      .in("intent_id", intentIds),
+    supa
+      .from("audit_log")
+      .select("event_type,payload")
+      .eq("event_type", "RISK_BLOCK")
+      .order("ts", { ascending: false })
+      .limit(500),
+  ]);
+
+  const fillsByIntent = new Map<
+    string,
+    { ts: string; quantity: number; price: string }[]
+  >();
+  for (const f of (fillsRes.data ?? []) as Array<{
+    intent_id: string;
+    ts: string;
+    quantity: number;
+    price: string | number;
+  }>) {
+    const list = fillsByIntent.get(f.intent_id) ?? [];
+    list.push({
+      ts: f.ts,
+      quantity: f.quantity,
+      price: typeof f.price === "string" ? f.price : String(f.price),
+    });
+    fillsByIntent.set(f.intent_id, list);
+  }
+
+  const blocksByIntent = new Map<string, string[]>();
+  for (const a of (riskRes.data ?? []) as Array<{
+    event_type: string;
+    payload: Record<string, unknown> | null;
+  }>) {
+    const p = a.payload ?? {};
+    const id = typeof p["intent_id"] === "string" ? (p["intent_id"] as string) : null;
+    if (!id || !intentIds.includes(id)) continue;
+    const reasons = Array.isArray(p["reasons"])
+      ? (p["reasons"] as unknown[]).map((x) => String(x))
+      : [];
+    if (!blocksByIntent.has(id)) blocksByIntent.set(id, reasons);
+  }
+
+  return (
+    intentRows as Array<{
+      intent_id: string;
+      created_at: string;
+      symbol: string;
+      is_option: boolean;
+      option_expiry: string | null;
+      option_strike: string | number | null;
+      option_right: string | null;
+      side: string;
+      quantity: number;
+      order_type: string;
+      limit_price: string | number | null;
+      dry_run: boolean;
+      submitted: boolean;
+      broker_order_id: string | null;
+      tag: string;
+    }>
+  ).map((r) => {
+    const fills = fillsByIntent.get(r.intent_id) ?? [];
+    const blockReasons = blocksByIntent.get(r.intent_id) ?? [];
+    let status: OrderStatus;
+    if (fills.length > 0) status = "filled";
+    else if (blockReasons.length > 0) status = "blocked";
+    else if (r.submitted) status = "placed";
+    else if (r.dry_run) status = "dry-run";
+    else status = "queued";
+    return {
+      intentId: r.intent_id,
+      createdAt: r.created_at,
+      symbol: r.symbol,
+      isOption: r.is_option,
+      optionExpiry: r.option_expiry,
+      optionStrike:
+        r.option_strike === null || r.option_strike === undefined
+          ? null
+          : typeof r.option_strike === "string"
+            ? r.option_strike
+            : String(r.option_strike),
+      optionRight: r.option_right,
+      side: r.side,
+      quantity: r.quantity,
+      orderType: r.order_type,
+      limitPrice:
+        r.limit_price === null || r.limit_price === undefined
+          ? null
+          : typeof r.limit_price === "string"
+            ? r.limit_price
+            : String(r.limit_price),
+      dryRun: r.dry_run,
+      submitted: r.submitted,
+      brokerOrderId: r.broker_order_id,
+      tag: r.tag,
+      fills,
+      blockReasons,
+      status,
+    };
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// /risk dashboard — read recent RISK_BLOCK / KILL_SWITCH events plus
+// today's realized P&L so the UI can show daily-loss-limit headroom.
+// ─────────────────────────────────────────────────────────────────────────
+
+export interface RiskBlockEvent {
+  ts: string;
+  intentId: string | null;
+  reasons: string[];
+  payload: Record<string, unknown>;
+}
+
+export async function fetchRiskBlocks(limit = 20): Promise<RiskBlockEvent[]> {
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("audit_log")
+    .select("ts,event_type,payload")
+    .eq("event_type", "RISK_BLOCK")
+    .order("ts", { ascending: false })
+    .limit(limit);
+  if (error || !data) return [];
+  return (
+    data as Array<{
+      ts: string;
+      event_type: string;
+      payload: Record<string, unknown> | null;
+    }>
+  ).map((r) => {
+    const p = r.payload ?? {};
+    const reasons = Array.isArray(p["reasons"])
+      ? (p["reasons"] as unknown[]).map((x) => String(x))
+      : [];
+    const intentId =
+      typeof p["intent_id"] === "string" ? (p["intent_id"] as string) : null;
+    return { ts: r.ts, intentId, reasons, payload: p };
+  });
+}
+
+export async function fetchTodayRealizedUsd(): Promise<number> {
+  const supabase = getSupabase();
+  if (!supabase) return 0;
+  const today = new Date().toISOString().slice(0, 10);
+  const { data, error } = await supabase
+    .from("daily_pnl")
+    .select("realized_usd")
+    .eq("trading_day", today)
+    .limit(1);
+  if (error || !data || data.length === 0) return 0;
+  const v = (data[0] as { realized_usd: string | number }).realized_usd;
+  const n = typeof v === "string" ? Number(v) : v;
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** Latest KILL_SWITCH event (active if exists and severity != INFO). */
+export async function fetchKillSwitchState(): Promise<{
+  lastSeen: string | null;
+  active: boolean;
+}> {
+  const supabase = getSupabase();
+  if (!supabase) return { lastSeen: null, active: false };
+  const { data, error } = await supabase
+    .from("audit_log")
+    .select("ts,severity,payload")
+    .eq("event_type", "KILL_SWITCH")
+    .order("ts", { ascending: false })
+    .limit(1);
+  if (error || !data || data.length === 0) return { lastSeen: null, active: false };
+  const row = data[0] as {
+    ts: string;
+    severity: string;
+    payload: Record<string, unknown> | null;
+  };
+  const active =
+    row.severity === "ERROR" ||
+    (row.payload?.["engaged"] === true) ||
+    (typeof row.payload?.["state"] === "string" &&
+      (row.payload["state"] as string).toLowerCase() === "engaged");
+  return { lastSeen: row.ts, active };
+}
+
+/** Most recent N bars across all symbols. Powers /status's "Live feed"
+ *  panel: the initial server-render fills the ring buffer that the
+ *  realtime subscription then keeps current. */
+export interface RecentBar {
+  symbol: string;
+  openTime: string;       // ISO
+  close: number;
+  volume: number;
+}
+
+export async function fetchRecentBars(limit = 10): Promise<RecentBar[]> {
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("bars")
+    .select("symbol,open_time,close,volume")
+    .order("open_time", { ascending: false })
+    .limit(limit);
+  if (error || !data) return [];
+  return (
+    data as Array<{
+      symbol: string;
+      open_time: string;
+      close: string | number;
+      volume: number;
+    }>
+  ).map((r) => ({
+    symbol: r.symbol,
+    openTime: r.open_time,
+    close: typeof r.close === "string" ? Number(r.close) : r.close,
+    volume: r.volume,
+  }));
+}
+
+/** Distinct symbols seen in the bars table (newest first). Powers the
+ *  /charts symbol picker. Falls back to a single-element array when
+ *  Supabase is unconfigured so the picker always has at least one option. */
+export async function fetchAvailableSymbols(): Promise<string[]> {
+  const supabase = getSupabase();
+  if (!supabase) return ["QQQ"];
+  // Supabase JS doesn't expose DISTINCT directly; we pull recent rows and
+  // dedupe in memory. 1k rows is enough to surface every active symbol.
+  const { data, error } = await supabase
+    .from("bars")
+    .select("symbol")
+    .order("open_time", { ascending: false })
+    .limit(1000);
+  if (error || !data) return ["QQQ"];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const r of data as { symbol: string }[]) {
+    if (!seen.has(r.symbol)) {
+      seen.add(r.symbol);
+      out.push(r.symbol);
+    }
+  }
+  if (out.length === 0) out.push("QQQ");
+  return out;
+}
+
+/** Names of the strategies the engine knows how to run. UI displays them
+ *  in a picker; the picker is read-only until Stream E ships the
+ *  runtime-override mechanism. */
+export const KNOWN_STRATEGIES = [
+  { id: "sma_vwap_cross", label: "Buy-vol cross (1-min bars)" },
+  { id: "sma_vwap_cross_tick", label: "Buy-vol cross (tick)" },
+  { id: "sell_put_qqq_cross", label: "Sell-put cross (tiered scale-out)" },
+] as const;
+
+export type StrategyId = (typeof KNOWN_STRATEGIES)[number]["id"];
+
 export interface FillRecord {
   ts: string;                    // ISO timestamp
   symbol: string;
