@@ -21,14 +21,17 @@ set -euo pipefail
 
 # ──────────── REQUIRED env vars ──────────────────────────────────────────
 : "${VERCEL_TOKEN:?Generate at https://vercel.com/account/tokens}"
-# Railway: account tokens use RAILWAY_API_TOKEN; older project tokens use
-# RAILWAY_TOKEN. We accept either but normalize to RAILWAY_API_TOKEN since
-# this script needs account-level commands (railway init, whoami, etc).
-if [[ -z "${RAILWAY_API_TOKEN:-}" && -n "${RAILWAY_TOKEN:-}" ]]; then
-  echo "==> NOTE: copying RAILWAY_TOKEN → RAILWAY_API_TOKEN (account token)"
-  export RAILWAY_API_TOKEN="$RAILWAY_TOKEN"
+
+# Railway accepts two token types:
+#   RAILWAY_API_TOKEN  → account-scoped; can run `railway init` to create projects
+#   RAILWAY_TOKEN      → project-scoped; only works against an existing project
+# This script supports either: with API token we'll create the project; with
+# project token we assume the project already exists and skip init.
+if [[ -z "${RAILWAY_API_TOKEN:-}" && -z "${RAILWAY_TOKEN:-}" ]]; then
+  echo "ERROR: set RAILWAY_API_TOKEN (account token) or RAILWAY_TOKEN (project token)"
+  echo "       generate at https://railway.com (Account or Project Settings → Tokens)"
+  exit 1
 fi
-: "${RAILWAY_API_TOKEN:?Generate an account token at https://railway.com/account/tokens (NOT a project token)}"
 : "${SUPABASE_URL:?From Project Settings → API}"
 : "${SUPABASE_PUBLISHABLE_KEY:?The 'publishable' (anon) key}"
 SUPABASE_DB_URL="${SUPABASE_DB_URL:-}"  # optional: skip migration if unset
@@ -126,14 +129,30 @@ command -v railway >/dev/null || {
 }
 echo "    $(railway --version)"
 
-# Railway CLI reads RAILWAY_API_TOKEN for account-scoped ops
-export RAILWAY_API_TOKEN
-# Pre-flight: confirm the token actually authenticates before we try ops
-railway whoami || {
-  echo "ERROR: railway whoami failed. Generate an ACCOUNT token at"
-  echo "       https://railway.com/account/tokens (not a project token)"
-  exit 1
-}
+if [[ -n "${RAILWAY_API_TOKEN:-}" ]]; then
+  echo "==> Railway: account token detected (will create project if needed)"
+  export RAILWAY_API_TOKEN
+  railway whoami || {
+    echo "ERROR: RAILWAY_API_TOKEN rejected. Generate an account token at"
+    echo "       https://railway.com (top-right avatar → Account Settings → Tokens)"
+    exit 1
+  }
+  if ! railway status 2>/dev/null | grep -qi 'project'; then
+    echo "==> Railway: init project alpha-kite-v2"
+    railway init --name alpha-kite-v2
+  fi
+else
+  echo "==> Railway: project token detected (project must already exist)"
+  echo "    Open https://railway.com first, click 'New Project' → 'Empty Project',"
+  echo "    name it (e.g. 'alpha-kite-v2'), then re-run this script."
+  echo "    Project tokens cannot create projects."
+  export RAILWAY_TOKEN
+  # Verify the token works against an existing project
+  railway status 2>/dev/null | grep -qi 'project' || {
+    echo "ERROR: RAILWAY_TOKEN does not point at an existing project."
+    exit 1
+  }
+fi
 
 if ! railway status 2>/dev/null | grep -qi 'project'; then
   echo "==> Railway: init project alpha-kite-v2"
