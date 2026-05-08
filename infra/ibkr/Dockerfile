@@ -1,18 +1,24 @@
 # syntax=docker/dockerfile:1.6
 # IBKR Gateway sidecar — paper trading only.
 #
-# Uses gnzsnz/ib-gateway:stable as the base. That image bundles IB Gateway,
-# IBC, and Xvfb headless display, all pre-configured. We add a paper-only
-# guard on top.
+# Uses gnzsnz/ib-gateway:stable as-is. That image bundles IB Gateway,
+# IBC, and Xvfb headless display, all pre-configured. Its own entrypoint
+# enforces TRADING_MODE — we don't add a redundant guard.
 #
 # Required env vars at runtime:
 #   TWS_USERID     — IBKR login (e.g. kaminski1337)
 #   TWS_PASSWORD   — IBKR password
-#   TRADING_MODE   — must be exactly "paper" (the entrypoint refuses anything else)
+#   TRADING_MODE   — must be "paper" (gnzsnz refuses anything else by default)
 #
 # Default ports exposed by gnzsnz/ib-gateway:
-#   4001 — live trading (we never expose this)
+#   4001 — live trading (NEVER expose this)
 #   4002 — paper trading (this is what the engine connects to)
+#
+# Multi-layer paper-mode safety in this repo:
+#   1. config/strategy.yaml schema rejects broker.mode != "paper" at load time
+#   2. PaperAccountGuard refuses non-DU paper account ids
+#   3. broker.dry_run defaults to true (no orders ever placed)
+#   4. gnzsnz's own entrypoint requires TRADING_MODE=paper
 #
 # IMPORTANT: by building/running this image you accept Interactive Brokers'
 # software license terms (https://www.interactivebrokers.com/en/index.php?f=14099).
@@ -21,22 +27,6 @@ FROM gnzsnz/ib-gateway:stable
 
 # Paper-trading port. We deliberately do NOT expose 4001 (live).
 EXPOSE 4002
-
-# Hard guard on top of gnzsnz's own check: refuse to start if TRADING_MODE
-# is anything other than "paper". The base image also enforces this but a
-# belt-and-braces check costs nothing.
-USER root
-RUN cat <<'EOF' > /etc/cont-init.d/00-paper-guard.sh
-#!/usr/bin/env bash
-set -euo pipefail
-mode_lc="$(printf '%s' "${TRADING_MODE:-}" | tr '[:upper:]' '[:lower:]')"
-if [[ "$mode_lc" != "paper" ]]; then
-  echo "FATAL: TRADING_MODE must be 'paper'; got '${TRADING_MODE:-<empty>}'" >&2
-  exit 65
-fi
-echo "paper-mode guard: OK"
-EOF
-RUN chmod +x /etc/cont-init.d/00-paper-guard.sh
 
 # Healthcheck — confirm the API port is open. First boot can take 90-120s
 # (Java/IB Gateway startup), so we give a generous start_period.
