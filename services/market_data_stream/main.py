@@ -57,21 +57,53 @@ async def run(cfg: StrategyConfig) -> None:
             payload={"feed": cfg.data.feed, "symbol": cfg.universe.symbol},
         ))
 
+    # IBKR feeds need explicit connect() before streams. yfinance/replay don't.
+    feed_connected = False
+    if hasattr(feed, "connect"):
+        try:
+            await feed.connect()
+            feed_connected = True
+        except Exception as exc:
+            LOG.error("feed connect failed: %s — heartbeat-only mode", exc)
+            await _audit("FEED_CONNECT_FAILED", "ERROR", str(exc))
+
     await _audit("STARTUP", "INFO", "market-data stream started")
 
     async def _drain_bars() -> None:
-        async for bar in feed.stream_equity_bars(
-            cfg.universe.symbol, cfg.data.bar_interval_seconds
-        ):
-            if stop_event.is_set():
-                return
-            await writer.write_bar(bar, feed=cfg.data.feed)
+        while not stop_event.is_set():
+            if hasattr(feed, "connect") and not feed_connected:
+                await asyncio.sleep(30)
+                continue
+            try:
+                async for bar in feed.stream_equity_bars(
+                    cfg.universe.symbol, cfg.data.bar_interval_seconds
+                ):
+                    if stop_event.is_set():
+                        return
+                    await writer.write_bar(bar, feed=cfg.data.feed)
+            except RuntimeError as exc:
+                if "not connected" in str(exc).lower():
+                    LOG.warning("bar stream lost connection: %s", exc)
+                    await asyncio.sleep(5)
+                    continue
+                raise
 
     async def _drain_quotes() -> None:
-        async for quote in feed.stream_equity_quotes(cfg.universe.symbol):
-            if stop_event.is_set():
-                return
-            await writer.write_tick(quote, feed=cfg.data.feed)
+        while not stop_event.is_set():
+            if hasattr(feed, "connect") and not feed_connected:
+                await asyncio.sleep(30)
+                continue
+            try:
+                async for quote in feed.stream_equity_quotes(cfg.universe.symbol):
+                    if stop_event.is_set():
+                        return
+                    await writer.write_tick(quote, feed=cfg.data.feed)
+            except RuntimeError as exc:
+                if "not connected" in str(exc).lower():
+                    LOG.warning("quote stream lost connection: %s", exc)
+                    await asyncio.sleep(5)
+                    continue
+                raise
 
     async def _heartbeat() -> None:
         while not stop_event.is_set():
@@ -84,6 +116,11 @@ async def run(cfg: StrategyConfig) -> None:
     await asyncio.gather(
         _drain_bars(), _drain_quotes(), _heartbeat(), return_exceptions=True
     )
+    if feed_connected and hasattr(feed, "disconnect"):
+        try:
+            await feed.disconnect()
+        except Exception:
+            pass
     await _audit("SHUTDOWN", "INFO", "market-data stream stopped")
     LOG.info("market-data stream stopped")
 

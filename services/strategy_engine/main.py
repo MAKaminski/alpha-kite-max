@@ -141,11 +141,26 @@ async def run(cfg: StrategyConfig) -> None:
     risk = _build_risk_pipeline(cfg)
     broker = _build_broker(cfg)
     await broker.connect()
+
+    # Some feeds (IBKR live/delayed) require an explicit connect() before
+    # any stream_* call. yfinance/replay/synthetic_options have no connect.
+    feed_connected = False
+    if hasattr(equity_feed, "connect"):
+        try:
+            await equity_feed.connect()
+            feed_connected = True
+            LOG.info("equity feed connected: %s", getattr(equity_feed, "name", "?"))
+        except Exception as exc:
+            LOG.error("equity feed connect failed: %s — engine will idle", exc)
+            await _audit(writer, "engine", "FEED_CONNECT_FAILED", "ERROR",
+                         str(exc), payload={"feed": cfg.data.feed})
+
     await _audit(writer, "engine", "STARTUP", "INFO",
                  f"engine started; feed={cfg.data.feed}", payload={
                      "feed": cfg.data.feed,
                      "broker_mode": cfg.broker.mode,
                      "dry_run": cfg.broker.dry_run,
+                     "feed_connected": feed_connected,
                  })
 
     bar_history: list = []
@@ -302,20 +317,45 @@ async def run(cfg: StrategyConfig) -> None:
     try:
         # Branch on strategy kind. Bar strategies consume bar streams; tick
         # strategies consume quote streams. Outer while-loop keeps the engine
-        # alive when an inner stream exhausts (yfinance returns finite batches).
+        # alive when an inner stream exhausts (yfinance returns finite batches)
+        # OR when the feed is disconnected (IBKR gateway booting).
         while not stop_event.is_set():
-            if getattr(strategy, "kind", "bar") == "tick":
-                async for quote in equity_feed.stream_equity_quotes(cfg.universe.symbol):
-                    if stop_event.is_set():
-                        break
-                    await _process_tick(quote)
-            else:
-                async for bar in equity_feed.stream_equity_bars(
-                    cfg.universe.symbol, cfg.data.bar_interval_seconds
-                ):
-                    if stop_event.is_set():
-                        break
-                    await _process_bar(bar)
+            # If the feed declared connect() and it failed, retry every 30s
+            # rather than crash-looping the container.
+            if hasattr(equity_feed, "connect") and not feed_connected:
+                LOG.info("feed not connected; retrying in 30s")
+                try:
+                    await asyncio.wait_for(stop_event.wait(), timeout=30)
+                except TimeoutError:
+                    pass
+                try:
+                    await equity_feed.connect()
+                    feed_connected = True
+                    LOG.info("equity feed reconnected")
+                except Exception as exc:
+                    LOG.error("feed reconnect failed: %s", exc)
+                    continue
+
+            try:
+                if getattr(strategy, "kind", "bar") == "tick":
+                    async for quote in equity_feed.stream_equity_quotes(cfg.universe.symbol):
+                        if stop_event.is_set():
+                            break
+                        await _process_tick(quote)
+                else:
+                    async for bar in equity_feed.stream_equity_bars(
+                        cfg.universe.symbol, cfg.data.bar_interval_seconds
+                    ):
+                        if stop_event.is_set():
+                            break
+                        await _process_bar(bar)
+            except RuntimeError as exc:
+                if "not connected" in str(exc).lower():
+                    LOG.warning("feed dropped connection mid-stream: %s", exc)
+                    feed_connected = False
+                    continue
+                raise
+
             if stop_event.is_set():
                 break
             try:
@@ -331,6 +371,11 @@ async def run(cfg: StrategyConfig) -> None:
         except (asyncio.CancelledError, Exception):
             pass
         await broker.disconnect()
+        if feed_connected and hasattr(equity_feed, "disconnect"):
+            try:
+                await equity_feed.disconnect()
+            except Exception:
+                pass
         await _audit(writer, "engine", "SHUTDOWN", "INFO", "engine shut down")
         LOG.info("strategy engine stopped")
 
