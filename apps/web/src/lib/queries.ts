@@ -10,6 +10,183 @@ import type {
 } from "@/types/api";
 
 // ─────────────────────────────────────────────────────────────────────────
+// /charts data shapes — bars + signal/fill markers for a given trading day
+// ─────────────────────────────────────────────────────────────────────────
+
+export interface ChartBar {
+  time: number;       // unix seconds (lightweight-charts native format)
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  vwap: number | null;
+}
+
+export interface ChartMarker {
+  time: number;       // unix seconds
+  kind: "signal_up" | "signal_down" | "buy_fill" | "sell_fill";
+  label: string;
+  price: number | null;
+}
+
+export interface DayPnl {
+  day: string;        // YYYY-MM-DD
+  realizedUsd: number;
+  cumulativeUsd: number;
+  trades: number;
+  wins: number;
+  losses: number;
+}
+
+interface BarRow {
+  symbol: string;
+  open_time: string;
+  open: string | number;
+  high: string | number;
+  low: string | number;
+  close: string | number;
+  volume: number;
+  vwap: string | number | null;
+}
+
+interface SignalRowChart {
+  ts: string;
+  direction: string;
+  symbol: string;
+  metadata: Record<string, unknown> | null;
+}
+
+interface FillRowChart {
+  ts: string;
+  symbol: string;
+  side: string;
+  price: string | number;
+  is_option: boolean;
+  option_strike: string | number | null;
+  option_right: string | null;
+}
+
+interface DailyPnlRowChart {
+  trading_day: string;
+  realized_usd: string | number;
+  trades: number;
+  wins: number;
+  losses: number;
+}
+
+const NUM = (v: string | number | null | undefined): number =>
+  v === null || v === undefined ? 0 : typeof v === "number" ? v : Number(v);
+
+export async function fetchChartBars(
+  symbol: string,
+  day: string,                     // YYYY-MM-DD (UTC date)
+): Promise<ChartBar[]> {
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  const dayStart = `${day}T00:00:00Z`;
+  const dayEnd = `${day}T23:59:59Z`;
+  const { data, error } = await supabase
+    .from("bars")
+    .select("symbol,open_time,open,high,low,close,volume,vwap")
+    .eq("symbol", symbol)
+    .gte("open_time", dayStart)
+    .lte("open_time", dayEnd)
+    .order("open_time", { ascending: true });
+  if (error || !data) return [];
+  return (data as BarRow[]).map((r) => ({
+    time: Math.floor(new Date(r.open_time).getTime() / 1000),
+    open: NUM(r.open),
+    high: NUM(r.high),
+    low: NUM(r.low),
+    close: NUM(r.close),
+    volume: r.volume,
+    vwap: r.vwap === null || r.vwap === undefined ? null : NUM(r.vwap),
+  }));
+}
+
+export async function fetchChartMarkers(
+  symbol: string,
+  day: string,
+): Promise<ChartMarker[]> {
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  const dayStart = `${day}T00:00:00Z`;
+  const dayEnd = `${day}T23:59:59Z`;
+
+  const [signalsRes, fillsRes] = await Promise.all([
+    supabase
+      .from("signals")
+      .select("ts,direction,symbol,metadata")
+      .eq("symbol", symbol)
+      .gte("ts", dayStart)
+      .lte("ts", dayEnd)
+      .order("ts", { ascending: true }),
+    supabase
+      .from("fills")
+      .select("ts,symbol,side,price,is_option,option_strike,option_right")
+      .eq("symbol", symbol)
+      .gte("ts", dayStart)
+      .lte("ts", dayEnd)
+      .order("ts", { ascending: true }),
+  ]);
+
+  const markers: ChartMarker[] = [];
+  if (signalsRes.data) {
+    for (const r of signalsRes.data as SignalRowChart[]) {
+      const dir = r.direction;
+      if (dir === "LONG_VOL_UP" || dir === "LONG_VOL_DOWN") {
+        markers.push({
+          time: Math.floor(new Date(r.ts).getTime() / 1000),
+          kind: dir === "LONG_VOL_UP" ? "signal_up" : "signal_down",
+          label: dir === "LONG_VOL_UP" ? "▲ UP" : "▼ DN",
+          price: null,
+        });
+      }
+    }
+  }
+  if (fillsRes.data) {
+    for (const r of fillsRes.data as FillRowChart[]) {
+      markers.push({
+        time: Math.floor(new Date(r.ts).getTime() / 1000),
+        kind: r.side === "BUY" ? "buy_fill" : "sell_fill",
+        label: `${r.side} ${r.is_option ? `${r.option_strike}${r.option_right}` : ""}`.trim(),
+        price: NUM(r.price),
+      });
+    }
+  }
+  markers.sort((a, b) => a.time - b.time);
+  return markers;
+}
+
+export async function fetchChartDailyPnl(daysBack = 30): Promise<DayPnl[]> {
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  const since = new Date();
+  since.setUTCDate(since.getUTCDate() - daysBack);
+  const sinceStr = since.toISOString().slice(0, 10);
+  const { data, error } = await supabase
+    .from("daily_pnl")
+    .select("trading_day,realized_usd,trades,wins,losses")
+    .gte("trading_day", sinceStr)
+    .order("trading_day", { ascending: true });
+  if (error || !data) return [];
+  let cum = 0;
+  return (data as DailyPnlRowChart[]).map((r) => {
+    const realized = NUM(r.realized_usd);
+    cum += realized;
+    return {
+      day: r.trading_day,
+      realizedUsd: realized,
+      cumulativeUsd: cum,
+      trades: r.trades,
+      wins: r.wins,
+      losses: r.losses,
+    };
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // Row shapes as returned by Supabase (snake_case mirroring the SQL schema).
 // We map these into the camelCase `api.ts` interfaces below.
 // ─────────────────────────────────────────────────────────────────────────

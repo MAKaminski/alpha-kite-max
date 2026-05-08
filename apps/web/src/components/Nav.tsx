@@ -7,6 +7,7 @@ interface NavProps {
 
 const LINKS: ReadonlyArray<{ href: string; label: string }> = [
   { href: "/status", label: "Status" },
+  { href: "/charts", label: "Charts" },
   { href: "/signals", label: "Signals" },
   { href: "/positions", label: "Positions" },
   { href: "/pnl", label: "P&L" },
