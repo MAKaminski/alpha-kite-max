@@ -142,8 +142,9 @@ class SupabaseBackend:
 
     async def _ensure_pool(self) -> Any:
         if self._pool is None:
-            import asyncpg
             import json
+
+            import asyncpg
 
             async def _init_conn(conn: Any) -> None:
                 # Register Python dict <-> JSONB/JSON codecs. Without this,
