@@ -22,7 +22,7 @@ WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY uv.loc[k] ./
 
-RUN uv sync --no-dev || uv pip install --system .
+RUN uv pip install --system .
 
 COPY contracts ./contracts
 COPY config ./config

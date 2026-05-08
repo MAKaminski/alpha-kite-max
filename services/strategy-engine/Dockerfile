@@ -26,8 +26,9 @@ COPY pyproject.toml README.md ./
 # Optional lockfile; copy only if present (BuildKit treats missing match as no-op via wildcard).
 COPY uv.loc[k] ./
 
-# Install runtime deps. Wave 2 may add a uv.lock; until then resolve from pyproject.
-RUN uv sync --no-dev || uv pip install --system .
+# Install runtime deps directly into system Python so `python -m …` resolves
+# them at runtime. (uv sync creates .venv, which the CMD doesn't activate.)
+RUN uv pip install --system .
 
 # Copy the project sources used at runtime. We intentionally include the whole
 # codebase since the orchestrator imports across packages (contracts, config,
