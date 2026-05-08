@@ -94,8 +94,30 @@ echo "==> Vercel: deploy --prod (cwd=repo root, rootDirectory=apps/web)"
 vercel --prod --yes --token "$VERCEL_TOKEN"
 
 # ──────────── Railway ────────────────────────────────────────────────────
-echo "==> Railway: install/upgrade CLI"
-command -v railway >/dev/null || npm i -g @railway/cli >/dev/null
+echo "==> Railway: ensure CLI is installed"
+if ! command -v railway >/dev/null; then
+  if command -v brew >/dev/null; then
+    brew install railway
+  elif command -v npm >/dev/null; then
+    npm i -g @railway/cli || {
+      echo "ERROR: 'npm i -g @railway/cli' failed (likely macOS permissions"
+      echo "       on the global npm prefix). Install via Homebrew instead:"
+      echo "         brew install railway"
+      echo "       or use the upstream installer:"
+      echo "         curl -fsSL https://railway.app/install.sh | sh"
+      exit 1
+    }
+  else
+    echo "ERROR: neither brew nor npm available; install Railway CLI manually"
+    echo "       https://docs.railway.app/guides/cli"
+    exit 1
+  fi
+fi
+command -v railway >/dev/null || {
+  echo "ERROR: railway CLI installed but not on PATH; restart your shell and re-run"
+  exit 1
+}
+echo "    $(railway --version)"
 
 export RAILWAY_TOKEN  # consumed by the CLI
 

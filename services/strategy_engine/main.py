@@ -143,6 +143,21 @@ async def run(cfg: StrategyConfig) -> None:
     posix_signal.signal(posix_signal.SIGINT, _on_signal)
     posix_signal.signal(posix_signal.SIGTERM, _on_signal)
 
+    # Background heartbeat so the /status page shows the engine alive even
+    # outside market hours when the bar stream is silent.
+    async def _heartbeat() -> None:
+        while not stop_event.is_set():
+            await _audit(writer, "engine", "HEARTBEAT", "INFO",
+                         "engine alive",
+                         payload={"feed": cfg.data.feed,
+                                  "dry_run": cfg.broker.dry_run})
+            try:
+                await asyncio.wait_for(stop_event.wait(), timeout=60)
+            except TimeoutError:
+                pass
+
+    heartbeat_task = asyncio.create_task(_heartbeat())
+
     try:
         async for bar in equity_feed.stream_equity_bars(
             cfg.universe.symbol, cfg.data.bar_interval_seconds
@@ -205,6 +220,11 @@ async def run(cfg: StrategyConfig) -> None:
                     open_positions += 1 if intent.side.name == "BUY" else -1
                     open_positions = max(open_positions, 0)
     finally:
+        heartbeat_task.cancel()
+        try:
+            await heartbeat_task
+        except (asyncio.CancelledError, Exception):
+            pass
         await broker.disconnect()
         await _audit(writer, "engine", "SHUTDOWN", "INFO", "engine shut down")
         LOG.info("strategy engine stopped")

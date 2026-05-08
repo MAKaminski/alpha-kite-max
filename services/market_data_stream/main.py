@@ -12,11 +12,13 @@ import logging
 import os
 import signal as posix_signal
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 from config.schema import StrategyConfig, load_config
 from engine.data_feeds.factory import make_feed
 
+from services.persistence.models import AuditEvent
 from services.persistence.storage import InMemoryBackend, StorageBackend, SupabaseBackend
 from services.persistence.writer import PersistenceWriter
 
@@ -45,6 +47,18 @@ async def run(cfg: StrategyConfig) -> None:
     posix_signal.signal(posix_signal.SIGINT, _on_signal)
     posix_signal.signal(posix_signal.SIGTERM, _on_signal)
 
+    async def _audit(event_type: str, severity: str, message: str) -> None:
+        await writer.write_audit(AuditEvent(
+            ts=datetime.now(UTC),
+            actor="market_data_stream",
+            event_type=event_type,
+            severity=severity,
+            message=message,
+            payload={"feed": cfg.data.feed, "symbol": cfg.universe.symbol},
+        ))
+
+    await _audit("STARTUP", "INFO", "market-data stream started")
+
     async def _drain_bars() -> None:
         async for bar in feed.stream_equity_bars(
             cfg.universe.symbol, cfg.data.bar_interval_seconds
@@ -59,7 +73,18 @@ async def run(cfg: StrategyConfig) -> None:
                 return
             await writer.write_tick(quote, feed=cfg.data.feed)
 
-    await asyncio.gather(_drain_bars(), _drain_quotes(), return_exceptions=True)
+    async def _heartbeat() -> None:
+        while not stop_event.is_set():
+            await _audit("HEARTBEAT", "INFO", "stream alive")
+            try:
+                await asyncio.wait_for(stop_event.wait(), timeout=60)
+            except TimeoutError:
+                pass
+
+    await asyncio.gather(
+        _drain_bars(), _drain_quotes(), _heartbeat(), return_exceptions=True
+    )
+    await _audit("SHUTDOWN", "INFO", "market-data stream stopped")
     LOG.info("market-data stream stopped")
 
 
