@@ -1,0 +1,44 @@
+# alpha-kite-v2 — Buy Volatility on QQQ Crosses
+# Defaults are safe: yfinance feed (delayed/free), paper broker, dry_run=true.
+# Flip data.feed to ibkr_live and dry_run to false only after Phase 2 backtest passes.
+
+data:
+  feed: yfinance              # yfinance | ibkr_delayed | replay | synthetic_options | ibkr_live
+  bar_interval_seconds: 60
+  options_feed: synthetic     # synthetic | ibkr_live
+  # replay_path: ./tests/fixtures/qqq_2026-04-15_1min.json  # required iff feed == replay
+
+broker:
+  name: ibkr
+  mode: paper                 # 'live' is hard-blocked in v1
+  host: 127.0.0.1
+  port: 7497
+  client_id: 17
+  dry_run: true               # log OrderIntent only; never call placeOrder
+  paper_account_allowlist: ["DEMO", "PAPER"]
+
+universe:
+  symbol: QQQ
+
+signal:
+  name: sma_vwap_cross
+  params:
+    sma_period: 9
+    vwap_session: regular
+
+entry:
+  strategy: long_vol
+  mode: directional           # directional | straddle
+  dte: 0
+  contracts: 1
+  max_premium_pct_nav: 0.5
+
+exit:
+  profit_target_pct: 30
+  stop_loss_pct: 25
+  time_stop_minutes_before_close: 30
+
+risk:
+  max_open_positions: 1
+  daily_loss_limit_usd: 50
+  kill_switch_file: ./KILL

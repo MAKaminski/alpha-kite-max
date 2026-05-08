@@ -1,0 +1,71 @@
+# Build context hygiene — keep image layers small and reproducible.
+
+# Version control & dev metadata
+.git
+.gitignore
+.github
+.gitattributes
+.editorconfig
+
+# Environments & secrets
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.crt
+*.cer
+*.p12
+*.pfx
+*.keystore
+*.jks
+.ibkr_credentials.json
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+.venv
+venv
+env
+.uv
+*.egg-info
+.mypy_cache
+.pytest_cache
+.ruff_cache
+.coverage
+coverage.xml
+htmlcov
+
+# Node / Next.js (web image installs fresh)
+node_modules
+.next
+.vercel
+*.tsbuildinfo
+next-env.d.ts
+
+# Tests, docs, fixtures — not needed in runtime images
+tests
+docs
+.worktrees
+.cache_ggshield
+
+# Bulky data fixtures
+data/historical
+*.parquet
+*.parquet.gz
+
+# IDE & OS noise
+.vscode
+.idea
+.DS_Store
+*.swp
+*.swo
+
+# Build outputs
+build
+dist
+out
+
+# Trading kill-switch sentinel must never end up baked into an image
+KILL

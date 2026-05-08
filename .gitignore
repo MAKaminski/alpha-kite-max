@@ -1,11 +1,6 @@
-# Environment Variables
+# Environment
 .env*
-!env.example
-
-# Dependencies
-node_modules/
-.pnp
-.pnp.js
+!.env.example
 
 # Python
 __pycache__/
@@ -16,55 +11,30 @@ __pycache__/
 env/
 venv/
 ENV/
-env.bak/
-venv.bak/
 .venv/
-pip-log.txt
-pip-delete-this-directory.txt
 *.egg-info/
 .mypy_cache/
 .pytest_cache/
+.ruff_cache/
 htmlcov/
-
-# Schwab tokens
-.schwab_tokens.json
-backend/config/schwab_token.json
-
-# SSL/TLS Certificates and Private Keys (SECURITY CRITICAL)
-*.key
-*.pem
-*.crt
-*.cer
-*.p12
-*.pfx
-*.keystore
-*.jks
-
-# Terraform
-infrastructure/.terraform/
-infrastructure/*.tfstate
-infrastructure/*.tfstate.backup
-infrastructure/.terraform.lock.hcl
-infrastructure/terraform.tfvars
-
-# Lambda deployment
-backend/lambda/package/
-backend/lambda/lambda_deployment.zip
-
-# Testing
-coverage/
-.nyc_output
+.coverage
+coverage.xml
 *.lcov
-.pytest_cache/
-htmlcov/
+.uv/
 
-# Next.js
+# Node / Next.js
+node_modules/
+.pnp
+.pnp.js
 .next/
+.vercel
 out/
 build/
 dist/
+*.tsbuildinfo
+next-env.d.ts
 
-# Production
+# Logs
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -80,10 +50,24 @@ lerna-debug.log*
 *~
 .DS_Store
 
-# Vercel
-.vercel
+# Trading kill-switch sentinel
+KILL
 
-# TypeScript
-*.tsbuildinfo
-next-env.d.ts
+# Worktrees and CI artifacts
+.worktrees/
+.cache_ggshield
 
+# Local data fixtures (large)
+data/historical/
+*.parquet.gz
+
+# Secrets
+*.key
+*.pem
+*.crt
+*.cer
+*.p12
+*.pfx
+*.keystore
+*.jks
+.ibkr_credentials.json

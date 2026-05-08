@@ -1,0 +1,76 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: python — ruff + pytest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[dev]'
+
+      - name: ruff
+        run: ruff check .
+
+      - name: pytest
+        run: pytest -m "not live and not supabase" --maxfail=1 -q
+
+      - name: backtest smoke
+        run: python scripts/backtest.py --config config/strategy.yaml --fixture tests/fixtures/qqq_2026-04-15_1min.json
+
+  frontend:
+    name: frontend — typecheck + build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: install
+        run: npm install --no-audit --no-fund
+
+      - name: type-check
+        run: npx tsc --noEmit
+
+      - name: build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy
+
+  migrations:
+    name: supabase migrations — sql lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: validate SQL parses
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+          for f in infra/supabase/migrations/*.sql; do
+            echo "checking $f"
+            psql --variable=ON_ERROR_STOP=1 -d "host=/tmp" -c "\\i $f" --set ON_ERROR_STOP=on || true
+          done

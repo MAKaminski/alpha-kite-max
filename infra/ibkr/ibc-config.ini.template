@@ -1,0 +1,35 @@
+; IBC configuration template. Rendered at container start; ${VAR} placeholders
+; are substituted from the environment. Credentials live in env, never on disk.
+
+# ── Login ──────────────────────────────────────────────────────────────────
+IbLoginId=${TWS_USERID}
+IbPassword=${TWS_PASSWORD}
+
+# Hard-coded to paper. The entrypoint also refuses to start if TRADING_MODE
+# is anything other than "paper", but we pin it here too so an attacker who
+# only flips this file still cannot reach a live account.
+TradingMode=paper
+
+# ── Behaviour ──────────────────────────────────────────────────────────────
+IbDir=/opt/tws
+GatewayOrTws=gateway
+FIX=no
+
+# Suppress dialogs that would otherwise wedge a headless container.
+AcceptIncomingConnectionAction=accept
+AcceptNonBrokerageAccountWarning=yes
+AllowBlindTrading=no
+DismissNSEComplianceNotice=yes
+DismissPasswordExpiryWarning=yes
+ReadOnlyApi=no
+
+# ── Daily session reset ────────────────────────────────────────────────────
+# IBKR forces a daily restart at 23:50 ET. IBC handles the relogin automatically
+# and we additionally rely on the docker healthcheck to bounce the container if
+# the API port stays closed for too long.
+ClosedownAt=
+ReloginAfterSecondFactor=yes
+
+# ── API ────────────────────────────────────────────────────────────────────
+OverrideTwsApiPort=7497
+SuppressInfoMessages=yes

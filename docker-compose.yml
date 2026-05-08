@@ -1,0 +1,125 @@
+# Local smoke-test stack for alpha-kite-v2.
+#
+# Brings up:
+#   - ibkr-gateway        : paper-only IBKR gateway
+#   - supabase-db         : Postgres seeded with infra/supabase/migrations
+#   - strategy-engine     : the orchestrator
+#   - market-data-stream  : the tick feed
+#   - web                 : Next.js dashboard (apps/web) in dev mode
+#
+# Usage:
+#   cp .env.example .env  # then fill in TWS_USERID / TWS_PASSWORD etc.
+#   docker compose up --build
+#
+# To kill the engine without taking the whole stack down, use the safety
+# sentinel:  `touch KILL`  (see infra/README.md).
+
+name: alpha-kite
+
+networks:
+  alpha-kite:
+    driver: bridge
+
+volumes:
+  supabase-data:
+
+services:
+  ibkr-gateway:
+    build:
+      context: .
+      dockerfile: infra/ibkr/Dockerfile
+    image: alpha-kite/ibkr-gateway:dev
+    env_file: .env
+    environment:
+      TWS_USERID: ${IBKR_USERNAME:-}
+      TWS_PASSWORD: ${IBKR_PASSWORD:-}
+      TRADING_MODE: ${IBKR_TRADING_MODE:-paper}
+    ports:
+      - "7497:7497"
+    networks:
+      - alpha-kite
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "7497"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+    restart: unless-stopped
+
+  supabase-db:
+    image: postgres:15-alpine
+    env_file: .env
+    environment:
+      # All three are required by the postgres image; supply via .env for
+      # local dev. .env.example documents the expected variable names.
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set in .env}
+    ports:
+      - "54322:5432"
+    volumes:
+      - supabase-data:/var/lib/postgresql/data
+      - ./infra/supabase/migrations:/docker-entrypoint-initdb.d:ro
+    networks:
+      - alpha-kite
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  strategy-engine:
+    build:
+      context: .
+      dockerfile: services/strategy-engine/Dockerfile
+    image: alpha-kite/strategy-engine:dev
+    env_file: .env
+    environment:
+      IBKR_HOST: ibkr-gateway
+      IBKR_PORT: "7497"
+      SUPABASE_DB_URL: ${SUPABASE_DB_URL:?SUPABASE_DB_URL must be set in .env}
+    depends_on:
+      ibkr-gateway:
+        condition: service_healthy
+      supabase-db:
+        condition: service_healthy
+    networks:
+      - alpha-kite
+    restart: on-failure
+
+  market-data-stream:
+    build:
+      context: .
+      dockerfile: services/market-data-stream/Dockerfile
+    image: alpha-kite/market-data-stream:dev
+    env_file: .env
+    environment:
+      IBKR_HOST: ibkr-gateway
+      IBKR_PORT: "7497"
+      SUPABASE_DB_URL: ${SUPABASE_DB_URL:?SUPABASE_DB_URL must be set in .env}
+    depends_on:
+      ibkr-gateway:
+        condition: service_healthy
+      supabase-db:
+        condition: service_healthy
+    networks:
+      - alpha-kite
+    restart: on-failure
+
+  web:
+    image: node:20-alpine
+    working_dir: /app
+    env_file: .env
+    environment:
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
+    command: sh -c "npm install && npm run dev -- --hostname 0.0.0.0 --port 3000"
+    volumes:
+      - ./apps/web:/app
+    ports:
+      - "3000:3000"
+    depends_on:
+      - supabase-db
+    networks:
+      - alpha-kite

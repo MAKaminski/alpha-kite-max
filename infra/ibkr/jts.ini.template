@@ -1,0 +1,27 @@
+; jts.ini — IBKR Gateway / TWS settings.
+; This file is rendered at container start; ${VAR} placeholders are substituted
+; from the environment. Do NOT put credentials in here directly.
+
+[Logon]
+Locale=en
+DisplayedProxyMsg=
+SkipSplashScreen=true
+UseSSL=true
+useRemoteSettings=false
+TrustedIPs=127.0.0.1
+
+[IBGateway]
+ApiOnly=true
+LocalServerPort=7497
+TrustedIPs=127.0.0.1
+WriteDebug=false
+
+[Communication]
+Region=usa
+Peer=
+SocksProxy=
+HttpProxy=
+
+; The following block is intentionally minimal. IBC writes additional sections
+; on first run; we only seed the values that must exist before the gateway
+; tries to bind a port.
