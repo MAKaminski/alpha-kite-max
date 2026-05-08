@@ -1,13 +1,15 @@
 import { Nav } from "@/components/Nav";
 import BacktestForm from "./BacktestForm";
-import { listFixtures } from "./RunBacktestAction";
+import { listFixtures, listSupabaseSymbols } from "./RunBacktestAction";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function BacktestPage() {
   const apiConfigured = !!process.env.BACKTEST_API_URL;
-  const fixtures = apiConfigured ? await listFixtures() : [];
+  const [fixtures, symbols] = apiConfigured
+    ? await Promise.all([listFixtures(), listSupabaseSymbols()])
+    : [[], []];
 
   return (
     <div>
@@ -16,13 +18,18 @@ export default async function BacktestPage() {
         <div>
           <h1 className="text-xl font-semibold">Backtest</h1>
           <p className="text-sm text-[var(--muted)]">
-            Replay a fixture through the configured strategy and see the
-            resulting trade ledger + summary stats. Optionally split the
-            trade history by date to compare in-sample vs. out-of-sample
-            performance.
+            Replay either a fixture or backfilled bars from Supabase through
+            the configured strategy. The Supabase mode uses whatever
+            <code className="mx-1 font-mono">scripts/backfill_bars.py</code>
+            has populated. Optionally split the trade history by date to
+            compare in-sample vs. out-of-sample performance.
           </p>
         </div>
-        <BacktestForm fixtures={fixtures} apiConfigured={apiConfigured} />
+        <BacktestForm
+          fixtures={fixtures}
+          symbols={symbols}
+          apiConfigured={apiConfigured}
+        />
       </main>
     </div>
   );

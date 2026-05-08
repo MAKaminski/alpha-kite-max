@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import os
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -114,12 +115,47 @@ async def _quote_for(
     return None
 
 
-async def run_backtest(config_path: str, fixture_path: str) -> Report:
-    cfg = load_config(config_path)
-    LOG.info("backtest start: feed=replay fixture=%s mode=%s",
-             fixture_path, cfg.entry.mode)
+async def run_backtest(
+    config_path: str,
+    fixture_path: str | None = None,
+    *,
+    symbol: str | None = None,
+    start: datetime | None = None,
+    end: datetime | None = None,
+    interval_seconds: int = 60,
+    dsn: str | None = None,
+) -> Report:
+    """Run the configured strategy through historical bars and return a Report.
 
-    feed = ReplayFeed(fixture_path)
+    Bars source: pass ``fixture_path`` (replay JSON) OR pass ``symbol`` +
+    ``start`` + ``end`` (Supabase ``bars`` table). The DB path uses the env
+    var ``SUPABASE_DB_URL`` by default; override via ``dsn``.
+    """
+    cfg = load_config(config_path)
+
+    feed: ReplayFeed | SupabaseBarsFeed
+    if fixture_path is not None:
+        LOG.info("backtest start: source=fixture fixture=%s mode=%s",
+                 fixture_path, cfg.entry.mode)
+        feed = ReplayFeed(fixture_path)
+    else:
+        if not (symbol and start and end):
+            raise ValueError(
+                "run_backtest requires either fixture_path, or symbol+start+end",
+            )
+        from engine.data_feeds.supabase_bars import SupabaseBarsFeed
+        actual_dsn = dsn or os.getenv("SUPABASE_DB_URL")
+        if not actual_dsn:
+            raise ValueError(
+                "SUPABASE_DB_URL is not set; cannot pull bars from the database",
+            )
+        LOG.info("backtest start: source=supabase symbol=%s %s..%s @%ds mode=%s",
+                 symbol, start.isoformat(), end.isoformat(), interval_seconds,
+                 cfg.entry.mode)
+        feed = SupabaseBarsFeed(
+            actual_dsn, symbol=symbol, start=start, end=end,
+            interval_seconds=interval_seconds,
+        )
     options_feed = SyntheticOptionsFeed(feed)
     strategy = BuyVolQQQCrossStrategy(
         symbol=cfg.universe.symbol,
@@ -149,8 +185,13 @@ async def run_backtest(config_path: str, fixture_path: str) -> Report:
     open_records: dict[uuid.UUID, TradeRecord] = {}
     report = Report()
 
+    # When pulling from Supabase, use the caller-supplied interval; for
+    # fixtures the value is fixed by the JSON schema.
+    stream_interval = (
+        interval_seconds if fixture_path is None else cfg.data.bar_interval_seconds
+    )
     async for bar in feed.stream_equity_bars(
-        cfg.universe.symbol, cfg.data.bar_interval_seconds
+        cfg.universe.symbol, stream_interval
     ):
         bar_history.append(bar)
 
@@ -202,6 +243,8 @@ async def run_backtest(config_path: str, fixture_path: str) -> Report:
     open_records.clear()
 
     await broker.disconnect()
+    if hasattr(feed, "close"):
+        await feed.close()
     return report
 
 

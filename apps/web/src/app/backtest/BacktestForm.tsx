@@ -1,39 +1,81 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   runBacktest,
+  type BacktestInput,
   type BacktestResult,
   type BacktestSummary,
+  type SymbolEntry,
 } from "./RunBacktestAction";
 
 interface Props {
   fixtures: string[];
+  symbols: SymbolEntry[];
   apiConfigured: boolean;
 }
 
-export default function BacktestForm({ fixtures, apiConfigured }: Props) {
+type Source = "fixture" | "supabase";
+
+export default function BacktestForm({ fixtures, symbols, apiConfigured }: Props) {
+  const defaultSource: Source = symbols.length > 0 ? "supabase" : "fixture";
+  const [source, setSource] = useState<Source>(defaultSource);
   const [fixture, setFixture] = useState(fixtures[0] ?? "");
+  const [symbolKey, setSymbolKey] = useState(
+    symbols.length > 0 ? `${symbols[0].symbol}|${symbols[0].interval_seconds}` : "",
+  );
+  const selectedSymbol = useMemo(
+    () => symbols.find((s) => `${s.symbol}|${s.interval_seconds}` === symbolKey),
+    [symbols, symbolKey],
+  );
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
   const [splitDate, setSplitDate] = useState("");
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<BacktestResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Default the date range to the symbol's full coverage when one is picked.
+  useMemo(() => {
+    if (selectedSymbol) {
+      if (!start) setStart(selectedSymbol.first_bar.slice(0, 16));
+      if (!end) setEnd(selectedSymbol.last_bar.slice(0, 16));
+    }
+  }, [selectedSymbol, start, end]);
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fixture) return;
     setRunning(true);
     setError(null);
     setResult(null);
-    const res = await runBacktest({
-      fixture,
-      splitDate: splitDate || undefined,
-    });
-    if (res.ok) {
-      setResult(res.data);
+
+    let input: BacktestInput;
+    if (source === "fixture") {
+      if (!fixture) {
+        setError("Pick a fixture first.");
+        setRunning(false);
+        return;
+      }
+      input = { source: "fixture", fixture, splitDate: splitDate || undefined };
     } else {
-      setError(res.error);
+      if (!selectedSymbol || !start || !end) {
+        setError("Pick a symbol and start/end timestamps.");
+        setRunning(false);
+        return;
+      }
+      input = {
+        source: "supabase",
+        symbol: selectedSymbol.symbol,
+        start: new Date(start).toISOString(),
+        end: new Date(end).toISOString(),
+        intervalSeconds: selectedSymbol.interval_seconds,
+        splitDate: splitDate || undefined,
+      };
     }
+
+    const res = await runBacktest(input);
+    if (res.ok) setResult(res.data);
+    else setError(res.error);
     setRunning(false);
   };
 
@@ -52,24 +94,95 @@ export default function BacktestForm({ fixtures, apiConfigured }: Props) {
         className="flex flex-wrap items-end gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm"
       >
         <label className="flex flex-col gap-1 text-xs text-[var(--muted)]">
-          Fixture
+          Source
           <select
-            value={fixture}
-            onChange={(e) => setFixture(e.target.value)}
-            disabled={fixtures.length === 0}
-            className="rounded-md border border-gray-300 px-2 py-1 text-sm font-mono"
+            value={source}
+            onChange={(e) => setSource(e.target.value as Source)}
+            className="rounded-md border border-gray-300 px-2 py-1 text-sm"
           >
-            {fixtures.length === 0 ? (
-              <option value="">(no fixtures available)</option>
-            ) : (
-              fixtures.map((f) => (
-                <option key={f} value={f}>
-                  {f}
-                </option>
-              ))
-            )}
+            <option value="supabase" disabled={symbols.length === 0}>
+              Supabase bars {symbols.length === 0 ? "(no rows yet)" : ""}
+            </option>
+            <option value="fixture" disabled={fixtures.length === 0}>
+              Fixture file
+            </option>
           </select>
         </label>
+
+        {source === "fixture" ? (
+          <label className="flex flex-col gap-1 text-xs text-[var(--muted)]">
+            Fixture
+            <select
+              value={fixture}
+              onChange={(e) => setFixture(e.target.value)}
+              disabled={fixtures.length === 0}
+              className="rounded-md border border-gray-300 px-2 py-1 text-sm font-mono"
+            >
+              {fixtures.length === 0 ? (
+                <option value="">(none available)</option>
+              ) : (
+                fixtures.map((f) => (
+                  <option key={f} value={f}>{f}</option>
+                ))
+              )}
+            </select>
+          </label>
+        ) : (
+          <>
+            <label className="flex flex-col gap-1 text-xs text-[var(--muted)]">
+              Symbol · interval
+              <select
+                value={symbolKey}
+                onChange={(e) => {
+                  setSymbolKey(e.target.value);
+                  // Reset range so the new symbol's coverage gets picked up.
+                  setStart("");
+                  setEnd("");
+                }}
+                disabled={symbols.length === 0}
+                className="rounded-md border border-gray-300 px-2 py-1 text-sm font-mono"
+              >
+                {symbols.length === 0 ? (
+                  <option value="">(no bars in DB — run scripts/backfill_bars.py)</option>
+                ) : (
+                  symbols.map((s) => {
+                    const k = `${s.symbol}|${s.interval_seconds}`;
+                    const lbl =
+                      s.interval_seconds === 60 ? "1m" :
+                      s.interval_seconds === 300 ? "5m" :
+                      s.interval_seconds === 3600 ? "1h" :
+                      s.interval_seconds === 86400 ? "1d" :
+                      `${s.interval_seconds}s`;
+                    return (
+                      <option key={k} value={k}>
+                        {s.symbol} {lbl} ({s.n_bars} bars)
+                      </option>
+                    );
+                  })
+                )}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-[var(--muted)]">
+              Start
+              <input
+                type="datetime-local"
+                value={start}
+                onChange={(e) => setStart(e.target.value)}
+                className="rounded-md border border-gray-300 px-2 py-1 text-sm font-mono"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-[var(--muted)]">
+              End
+              <input
+                type="datetime-local"
+                value={end}
+                onChange={(e) => setEnd(e.target.value)}
+                className="rounded-md border border-gray-300 px-2 py-1 text-sm font-mono"
+              />
+            </label>
+          </>
+        )}
+
         <label className="flex flex-col gap-1 text-xs text-[var(--muted)]">
           Split date (optional, ISO)
           <input
@@ -82,7 +195,7 @@ export default function BacktestForm({ fixtures, apiConfigured }: Props) {
         </label>
         <button
           type="submit"
-          disabled={running || !apiConfigured || !fixture}
+          disabled={running || !apiConfigured}
           className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {running ? "Running…" : "Run backtest"}

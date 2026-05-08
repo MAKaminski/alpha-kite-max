@@ -20,6 +20,7 @@ Endpoints
 
 from __future__ import annotations
 
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -45,9 +46,21 @@ app.add_middleware(
 
 
 class RunRequest(BaseModel):
-    fixture: str = Field(
+    """Either ``fixture`` (replay JSON) OR ``symbol``+``start``+``end`` (DB)."""
+
+    # Fixture mode
+    fixture: str | None = Field(
+        default=None,
         description="Path to the fixture JSON, e.g. tests/fixtures/qqq_2026-04-15_1min.json",
     )
+    # DB-bars mode
+    symbol: str | None = Field(default=None, description="Symbol to pull from bars table")
+    start: str | None = Field(default=None, description="ISO-8601 start timestamp (inclusive)")
+    end: str | None = Field(default=None, description="ISO-8601 end timestamp (exclusive)")
+    interval_seconds: int = Field(
+        default=60, description="Bar interval to replay; matches bars.interval_seconds",
+    )
+
     config: str = Field(default=DEFAULT_CONFIG)
     split_date: str | None = Field(
         default=None,
@@ -73,16 +86,85 @@ def list_fixtures() -> dict[str, list[str]]:
     return {"fixtures": files}
 
 
+@app.get("/symbols")
+async def list_symbols() -> dict:
+    """List (symbol, interval_seconds) pairs available in the bars table.
+
+    The /backtest UI uses this to populate the DB-bars-mode dropdowns.
+    """
+    dsn = os.getenv("SUPABASE_DB_URL")
+    if not dsn:
+        return {"symbols": [], "error": "SUPABASE_DB_URL not configured"}
+    import asyncpg
+    pool = await asyncpg.create_pool(dsn, min_size=1, max_size=2)
+    try:
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT symbol, interval_seconds, "
+                "MIN(open_time) AS first_bar, MAX(open_time) AS last_bar, "
+                "COUNT(*) AS n_bars "
+                "FROM bars GROUP BY symbol, interval_seconds "
+                "ORDER BY symbol, interval_seconds"
+            )
+        return {
+            "symbols": [
+                {
+                    "symbol": r["symbol"],
+                    "interval_seconds": int(r["interval_seconds"]),
+                    "first_bar": r["first_bar"].isoformat(),
+                    "last_bar": r["last_bar"].isoformat(),
+                    "n_bars": int(r["n_bars"]),
+                }
+                for r in rows
+            ],
+        }
+    finally:
+        await pool.close()
+
+
 @app.post("/run")
 async def run(req: RunRequest) -> dict:
-    fixture_path = Path(req.fixture)
-    if not fixture_path.exists():
-        raise HTTPException(status_code=404, detail=f"fixture not found: {req.fixture}")
     config_path = Path(req.config)
     if not config_path.exists():
         raise HTTPException(status_code=404, detail=f"config not found: {req.config}")
 
-    report = await run_backtest(req.config, req.fixture)
+    if req.fixture and (req.symbol or req.start or req.end):
+        raise HTTPException(
+            status_code=400,
+            detail="pass either fixture OR symbol+start+end, not both",
+        )
+    if not req.fixture and not (req.symbol and req.start and req.end):
+        raise HTTPException(
+            status_code=400,
+            detail="must pass either fixture or symbol+start+end",
+        )
+
+    if req.fixture:
+        fixture_path = Path(req.fixture)
+        if not fixture_path.exists():
+            raise HTTPException(status_code=404, detail=f"fixture not found: {req.fixture}")
+        report = await run_backtest(req.config, req.fixture)
+        source_label: dict = {"fixture": req.fixture}
+    else:
+        try:
+            start_dt = datetime.fromisoformat((req.start or "").replace("Z", "+00:00"))
+            end_dt = datetime.fromisoformat((req.end or "").replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=f"invalid start/end: {exc}") from exc
+        report = await run_backtest(
+            req.config,
+            fixture_path=None,
+            symbol=req.symbol,
+            start=start_dt,
+            end=end_dt,
+            interval_seconds=req.interval_seconds,
+        )
+        source_label = {
+            "symbol": req.symbol,
+            "start": req.start,
+            "end": req.end,
+            "interval_seconds": req.interval_seconds,
+        }
 
     # Trade list — kept compact so payloads stay small for the UI.
     trades_payload = [
@@ -103,7 +185,7 @@ async def run(req: RunRequest) -> dict:
     ]
 
     body: dict = {
-        "fixture": req.fixture,
+        **source_label,
         "config": req.config,
         "summary": report.summary(),
         "trades": trades_payload,

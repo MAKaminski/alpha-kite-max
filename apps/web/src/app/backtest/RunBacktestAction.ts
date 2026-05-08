@@ -47,10 +47,28 @@ export interface BacktestResult {
   };
 }
 
-export async function runBacktest(input: {
-  fixture: string;
-  splitDate?: string;
-}): Promise<{ ok: true; data: BacktestResult } | { ok: false; error: string }> {
+export interface SymbolEntry {
+  symbol: string;
+  interval_seconds: number;
+  first_bar: string;
+  last_bar: string;
+  n_bars: number;
+}
+
+export type BacktestInput =
+  | { source: "fixture"; fixture: string; splitDate?: string }
+  | {
+      source: "supabase";
+      symbol: string;
+      start: string;
+      end: string;
+      intervalSeconds: number;
+      splitDate?: string;
+    };
+
+export async function runBacktest(
+  input: BacktestInput,
+): Promise<{ ok: true; data: BacktestResult } | { ok: false; error: string }> {
   const baseUrl = process.env.BACKTEST_API_URL;
   if (!baseUrl) {
     return {
@@ -59,16 +77,24 @@ export async function runBacktest(input: {
         "BACKTEST_API_URL is not set on the web app. Deploy services/backtest-api/ to Railway and set this env var.",
     };
   }
+  const body: Record<string, unknown> =
+    input.source === "fixture"
+      ? { fixture: input.fixture, split_date: input.splitDate || null }
+      : {
+          symbol: input.symbol,
+          start: input.start,
+          end: input.end,
+          interval_seconds: input.intervalSeconds,
+          split_date: input.splitDate || null,
+        };
+
   try {
     const res = await fetch(`${baseUrl.replace(/\/$/, "")}/run`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        fixture: input.fixture,
-        split_date: input.splitDate || null,
-      }),
-      // Backtests are typically fast (<5s) but cap at 60s.
-      signal: AbortSignal.timeout(60_000),
+      body: JSON.stringify(body),
+      // DB-bars backtests over many days can take longer than fixture replay.
+      signal: AbortSignal.timeout(120_000),
     });
     if (!res.ok) {
       const text = await res.text();
@@ -89,12 +115,27 @@ export async function listFixtures(): Promise<string[]> {
   if (!baseUrl) return [];
   try {
     const res = await fetch(`${baseUrl.replace(/\/$/, "")}/fixtures`, {
-      // Cache for 60s — fixtures rarely change.
       next: { revalidate: 60 },
     });
     if (!res.ok) return [];
     const j = (await res.json()) as { fixtures: string[] };
     return j.fixtures;
+  } catch {
+    return [];
+  }
+}
+
+export async function listSupabaseSymbols(): Promise<SymbolEntry[]> {
+  const baseUrl = process.env.BACKTEST_API_URL;
+  if (!baseUrl) return [];
+  try {
+    const res = await fetch(`${baseUrl.replace(/\/$/, "")}/symbols`, {
+      // Bar coverage changes only when backfill runs — short cache is plenty.
+      next: { revalidate: 30 },
+    });
+    if (!res.ok) return [];
+    const j = (await res.json()) as { symbols?: SymbolEntry[] };
+    return j.symbols ?? [];
   } catch {
     return [];
   }
