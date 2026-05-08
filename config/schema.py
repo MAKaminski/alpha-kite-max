@@ -58,10 +58,13 @@ class UniverseConfig(_Strict):
 class SignalParams(_Strict):
     sma_period: int = 9
     vwap_session: Literal["regular", "extended"] = "regular"
+    # Tick-strategy params (ignored by bar strategy)
+    sma_window_seconds: int = 9
+    confirmation_seconds: int = 5
 
 
 class SignalConfig(_Strict):
-    name: Literal["sma_vwap_cross"] = "sma_vwap_cross"
+    name: Literal["sma_vwap_cross", "sma_vwap_cross_tick"] = "sma_vwap_cross"
     params: SignalParams = Field(default_factory=SignalParams)
 
 

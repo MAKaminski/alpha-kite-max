@@ -90,6 +90,11 @@ class BuyVolQQQCrossStrategy:
     """SMA9/VWAP cross long-vol strategy implementing the Strategy Protocol."""
 
     name: str = "buy_vol_qqq_cross"
+    kind: str = "bar"
+
+    def on_tick(self, ctx):
+        """Bar strategies don't act on ticks."""
+        return StrategyDecision()
 
     def __init__(
         self,
