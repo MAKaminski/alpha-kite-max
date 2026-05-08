@@ -19,7 +19,7 @@ RUN pip install uv
 
 WORKDIR /app
 
-COPY pyproject.toml ./
+COPY pyproject.toml README.md ./
 COPY uv.loc[k] ./
 
 RUN uv sync --no-dev || uv pip install --system .

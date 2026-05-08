@@ -22,7 +22,7 @@ RUN pip install uv
 WORKDIR /app
 
 # Layer-cache deps separately from sources.
-COPY pyproject.toml ./
+COPY pyproject.toml README.md ./
 # Optional lockfile; copy only if present (BuildKit treats missing match as no-op via wildcard).
 COPY uv.loc[k] ./
 
