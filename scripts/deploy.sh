@@ -56,15 +56,21 @@ fi
 echo "==> Vercel: install/upgrade CLI"
 command -v vercel >/dev/null || npm i -g vercel >/dev/null
 
-cd "$REPO_ROOT/apps/web"
+# Run all Vercel ops from REPO ROOT, not from apps/web. After the
+# rootDirectory PATCH below, Vercel resolves deploy source as
+# cwd + rootDirectory; if cwd is already apps/web, you get apps/web/apps/web
+# (404). The project link file ends up at $REPO_ROOT/.vercel/project.json.
+cd "$REPO_ROOT"
 
-echo "==> Vercel: link project (creates if missing)"
-# --yes accepts defaults; --project pins the slug. If a project with this
-# slug already exists in your scope, Vercel links to it.
+# Clean any stale link from a prior attempt (e.g. apps/web/.vercel from v1
+# of this script).
+rm -rf "$REPO_ROOT/apps/web/.vercel"
+
+echo "==> Vercel: link project at repo root (creates if missing)"
 vercel link --yes --project alpha-kite-max --token "$VERCEL_TOKEN"
 
-PROJECT_ID=$(jq -r .projectId .vercel/project.json)
-ORG_ID=$(jq -r .orgId .vercel/project.json)
+PROJECT_ID=$(jq -r .projectId "$REPO_ROOT/.vercel/project.json")
+ORG_ID=$(jq -r .orgId "$REPO_ROOT/.vercel/project.json")
 
 echo "==> Vercel: PATCH rootDirectory=apps/web (CLI lacks a flag for this)"
 curl -sS -X PATCH \
@@ -79,14 +85,13 @@ for env in production preview development; do
   for var in NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY; do
     vercel env remove "$var" "$env" --yes --token "$VERCEL_TOKEN" 2>/dev/null || true
   done
-  printf "%s" "$SUPABASE_URL"             | vercel env add NEXT_PUBLIC_SUPABASE_URL      "$env" --token "$VERCEL_TOKEN"
-  printf "%s" "$SUPABASE_PUBLISHABLE_KEY" | vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY "$env" --token "$VERCEL_TOKEN"
+  # Trailing newline keeps the optional "Git branch?" prompt happy on preview env.
+  printf "%s\n" "$SUPABASE_URL"             | vercel env add NEXT_PUBLIC_SUPABASE_URL      "$env" --token "$VERCEL_TOKEN"
+  printf "%s\n" "$SUPABASE_PUBLISHABLE_KEY" | vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY "$env" --token "$VERCEL_TOKEN"
 done
 
-echo "==> Vercel: deploy --prod (root is apps/web after link)"
+echo "==> Vercel: deploy --prod (cwd=repo root, rootDirectory=apps/web)"
 vercel --prod --yes --token "$VERCEL_TOKEN"
-
-cd "$REPO_ROOT"
 
 # ──────────── Railway ────────────────────────────────────────────────────
 echo "==> Railway: install/upgrade CLI"
