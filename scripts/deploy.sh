@@ -1,18 +1,25 @@
 #!/usr/bin/env bash
 # alpha-kite-v2 deploy script.
 #
-# Provisions Vercel + Railway + applies the Supabase migration from your
+# Provisions Vercel + Railway + applies every Supabase migration from your
 # local shell. The Claude Code sandbox where this script was authored
 # cannot reach api.vercel.com / backboard.railway.app / Supabase, so the
 # script must be run from a network with outbound access.
 #
-# Usage:
-#   export VERCEL_TOKEN=...
-#   export RAILWAY_TOKEN=...
+# Usage (one shot, all four env vars exported):
+#   export VERCEL_TOKEN=...                   # https://vercel.com/account/tokens
+#   export RAILWAY_TOKEN=...                  # https://railway.com (project token)
 #   export SUPABASE_URL=https://<ref>.supabase.co
-#   export SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+#   export SUPABASE_PUBLISHABLE_KEY=sb_publishable_...   # the "anon" key
 #   export SUPABASE_DB_URL='postgres://postgres.<ref>:<pw>@<host>:5432/postgres?sslmode=require'
+#   export SUPABASE_SERVICE_ROLE_KEY=...      # secret service-role key (for /live-enable writes)
 #   bash scripts/deploy.sh
+#
+# Optional toggles:
+#   RUN_BACKFILL=1     also run scripts/backfill_bars.py for QQQ (slow:
+#                      yfinance pulls 1m/5m/1h/1d at each tier's free-cap)
+#   BACKFILL_SYMBOLS="QQQ SPY"  defaults to "QQQ" when RUN_BACKFILL=1
+#   SKIP_PRECHECK=1    skip the local pytest+backtest sanity run
 #
 # Idempotent except for `vercel --prod` (always deploys a new build) and
 # `railway up` (always deploys a new revision).
@@ -34,7 +41,10 @@ if [[ -z "${RAILWAY_API_TOKEN:-}" && -z "${RAILWAY_TOKEN:-}" ]]; then
 fi
 : "${SUPABASE_URL:?From Project Settings → API}"
 : "${SUPABASE_PUBLISHABLE_KEY:?The 'publishable' (anon) key}"
-SUPABASE_DB_URL="${SUPABASE_DB_URL:-}"  # optional: skip migration if unset
+SUPABASE_DB_URL="${SUPABASE_DB_URL:-}"  # optional: skip migrations if unset
+SUPABASE_SERVICE_ROLE_KEY="${SUPABASE_SERVICE_ROLE_KEY:-}"  # optional: needed for /live-enable
+RUN_BACKFILL="${RUN_BACKFILL:-0}"
+BACKFILL_SYMBOLS="${BACKFILL_SYMBOLS:-QQQ}"
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
@@ -49,61 +59,33 @@ else
   echo "==> precheck: SKIPPED (pytest not installed locally; CI already validates)"
 fi
 
-# ──────────── Supabase migration FIRST (so services have tables ready) ───
+# ──────────── Supabase migrations FIRST (so services have tables ready) ──
 if [[ -n "$SUPABASE_DB_URL" ]]; then
-  echo "==> Supabase: apply infra/supabase/migrations/0001_initial.sql"
   command -v psql >/dev/null || {
     echo "psql not found — install postgresql-client (e.g. brew install libpq)"; exit 1;
   }
-  psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 \
-    -f "$REPO_ROOT/infra/supabase/migrations/0001_initial.sql"
-  echo "    tables created"
+  for sql in "$REPO_ROOT"/infra/supabase/migrations/*.sql; do
+    echo "==> Supabase: apply $(basename "$sql")"
+    psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f "$sql"
+  done
+  echo "    all migrations applied"
 else
-  echo "==> Supabase: SUPABASE_DB_URL not set — skipping SQL migration"
+  echo "==> Supabase: SUPABASE_DB_URL not set — skipping SQL migrations"
 fi
 
-# ──────────── Vercel ─────────────────────────────────────────────────────
-echo "==> Vercel: install/upgrade CLI"
-command -v vercel >/dev/null || npm i -g vercel >/dev/null
-
-# Run all Vercel ops from REPO ROOT, not from apps/web. After the
-# rootDirectory PATCH below, Vercel resolves deploy source as
-# cwd + rootDirectory; if cwd is already apps/web, you get apps/web/apps/web
-# (404). The project link file ends up at $REPO_ROOT/.vercel/project.json.
-cd "$REPO_ROOT"
-
-# Clean any stale link from a prior attempt (e.g. apps/web/.vercel from v1
-# of this script).
-rm -rf "$REPO_ROOT/apps/web/.vercel"
-
-echo "==> Vercel: link project at repo root (creates if missing)"
-vercel link --yes --project alpha-kite-max --token "$VERCEL_TOKEN"
-
-PROJECT_ID=$(jq -r .projectId "$REPO_ROOT/.vercel/project.json")
-ORG_ID=$(jq -r .orgId "$REPO_ROOT/.vercel/project.json")
-
-echo "==> Vercel: PATCH rootDirectory=apps/web (CLI lacks a flag for this)"
-curl -sS -X PATCH \
-  -H "Authorization: Bearer $VERCEL_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"rootDirectory":"apps/web","framework":"nextjs"}' \
-  "https://api.vercel.com/v9/projects/$PROJECT_ID?teamId=$ORG_ID" >/dev/null
-echo "    rootDirectory patched"
-
-echo "==> Vercel: set env vars (production + preview + development)"
-for env in production preview development; do
-  for var in NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY; do
-    vercel env remove "$var" "$env" --yes --token "$VERCEL_TOKEN" 2>/dev/null || true
+# ──────────── (optional) historical bar backfill ─────────────────────────
+if [[ "$RUN_BACKFILL" == "1" && -n "$SUPABASE_DB_URL" ]]; then
+  for sym in $BACKFILL_SYMBOLS; do
+    echo "==> Backfill: $sym (1m/7d, 5m/60d, 1h/730d, 1d/5y)"
+    SUPABASE_DB_URL="$SUPABASE_DB_URL" \
+      python -m scripts.backfill_bars --symbol "$sym"
   done
-  # Trailing newline keeps the optional "Git branch?" prompt happy on preview env.
-  printf "%s\n" "$SUPABASE_URL"             | vercel env add NEXT_PUBLIC_SUPABASE_URL      "$env" --token "$VERCEL_TOKEN"
-  printf "%s\n" "$SUPABASE_PUBLISHABLE_KEY" | vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY "$env" --token "$VERCEL_TOKEN"
-done
-
-echo "==> Vercel: deploy --prod (cwd=repo root, rootDirectory=apps/web)"
-vercel --prod --yes --token "$VERCEL_TOKEN"
+fi
 
 # ──────────── Railway ────────────────────────────────────────────────────
+# We run Railway BEFORE Vercel so that the backtest-api service gets a
+# public domain we can set on Vercel (BACKTEST_API_URL) before the
+# Vercel build picks it up.
 echo "==> Railway: ensure CLI is installed"
 if ! command -v railway >/dev/null; then
   if command -v brew >/dev/null; then
@@ -158,6 +140,7 @@ fi
 deploy_service() {
   local svc="$1"
   local dockerfile="$2"
+  local expose="${3:-private}"   # pass "public" to generate a *.up.railway.app domain
 
   echo "==> Railway: ensure service '$svc' exists"
   if ! railway service list 2>/dev/null | grep -q "$svc"; then
@@ -182,16 +165,94 @@ deploy_service() {
 
   echo "==> Railway: deploy '$svc'"
   railway up --detach --service "$svc"
+
+  if [[ "$expose" == "public" ]]; then
+    echo "==> Railway: ensure '$svc' has a public domain"
+    # `railway domain` with no args either prints the existing domain or
+    # generates a new *.up.railway.app one.
+    railway domain --service "$svc" 2>/dev/null || railway domain
+  fi
 }
 
 deploy_service strategy-engine     services/strategy-engine/Dockerfile
 deploy_service market-data-stream  services/market-data-stream/Dockerfile
+deploy_service backtest-api        services/backtest-api/Dockerfile  public
+
+# After deploy_service backtest-api, capture the public URL so we can
+# wire it onto Vercel as BACKTEST_API_URL.
+echo "==> Railway: capture backtest-api domain"
+railway service link backtest-api >/dev/null 2>&1 || true
+BACKTEST_API_DOMAIN="$(railway domain --service backtest-api 2>/dev/null \
+  | grep -oE '[a-z0-9.-]+\.up\.railway\.app' | head -1 || true)"
+if [[ -z "$BACKTEST_API_DOMAIN" ]]; then
+  # Fallback: parse `railway service` info.
+  BACKTEST_API_DOMAIN="$(railway service backtest-api 2>/dev/null \
+    | grep -oE '[a-z0-9.-]+\.up\.railway\.app' | head -1 || true)"
+fi
+if [[ -n "$BACKTEST_API_DOMAIN" ]]; then
+  BACKTEST_API_URL="https://${BACKTEST_API_DOMAIN}"
+  echo "    backtest-api URL = $BACKTEST_API_URL"
+else
+  BACKTEST_API_URL=""
+  echo "    WARNING: could not auto-detect backtest-api domain."
+  echo "    Find it under Railway → backtest-api → Settings → Networking,"
+  echo "    then set BACKTEST_API_URL on Vercel manually."
+fi
+
+# ──────────── Vercel ─────────────────────────────────────────────────────
+echo "==> Vercel: install/upgrade CLI"
+command -v vercel >/dev/null || npm i -g vercel >/dev/null
+
+# Run all Vercel ops from REPO ROOT, not from apps/web. After the
+# rootDirectory PATCH below, Vercel resolves deploy source as
+# cwd + rootDirectory; if cwd is already apps/web, you get apps/web/apps/web
+# (404). The project link file ends up at $REPO_ROOT/.vercel/project.json.
+cd "$REPO_ROOT"
+
+# Clean any stale link from a prior attempt (e.g. apps/web/.vercel from v1
+# of this script).
+rm -rf "$REPO_ROOT/apps/web/.vercel"
+
+echo "==> Vercel: link project at repo root (creates if missing)"
+vercel link --yes --project alpha-kite-max --token "$VERCEL_TOKEN"
+
+PROJECT_ID=$(jq -r .projectId "$REPO_ROOT/.vercel/project.json")
+ORG_ID=$(jq -r .orgId "$REPO_ROOT/.vercel/project.json")
+
+echo "==> Vercel: PATCH rootDirectory=apps/web (CLI lacks a flag for this)"
+curl -sS -X PATCH \
+  -H "Authorization: Bearer $VERCEL_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"rootDirectory":"apps/web","framework":"nextjs"}' \
+  "https://api.vercel.com/v9/projects/$PROJECT_ID?teamId=$ORG_ID" >/dev/null
+echo "    rootDirectory patched"
+
+echo "==> Vercel: set env vars (production + preview + development)"
+set_vercel_env() {
+  local var="$1" value="$2" env="$3"
+  [[ -z "$value" ]] && return 0
+  vercel env remove "$var" "$env" --yes --token "$VERCEL_TOKEN" 2>/dev/null || true
+  printf "%s\n" "$value" | vercel env add "$var" "$env" --token "$VERCEL_TOKEN"
+}
+
+for env in production preview development; do
+  set_vercel_env NEXT_PUBLIC_SUPABASE_URL      "$SUPABASE_URL"             "$env"
+  set_vercel_env NEXT_PUBLIC_SUPABASE_ANON_KEY "$SUPABASE_PUBLISHABLE_KEY" "$env"
+  # New env vars (streams I + E):
+  set_vercel_env BACKTEST_API_URL              "$BACKTEST_API_URL"         "$env"
+  set_vercel_env SUPABASE_SERVICE_ROLE_KEY     "$SUPABASE_SERVICE_ROLE_KEY" "$env"
+done
+
+echo "==> Vercel: deploy --prod (cwd=repo root, rootDirectory=apps/web)"
+vercel --prod --yes --token "$VERCEL_TOKEN"
 
 echo
 echo "──── done ────"
-echo "Vercel:   production URL printed above"
-echo "Railway:  https://railway.app/dashboard → alpha-kite-v2"
-echo "Logs:     railway logs --service strategy-engine"
+echo "Vercel:        production URL printed above"
+echo "Railway:       https://railway.app/dashboard → alpha-kite-v2"
+echo "Logs:          railway logs --service strategy-engine"
+[[ -n "$BACKTEST_API_URL" ]] && \
+  echo "Backtest API:  $BACKTEST_API_URL/healthz   (should return {\"ok\":true})"
 echo
-echo "broker.dry_run is still TRUE (default). No orders are placed until you"
-echo "edit config/strategy.yaml AND have a DU* paper account validated."
+echo "broker.dry_run is still TRUE (default). Use /live-enable in the dashboard"
+echo "(or edit config/strategy.yaml + restart strategy-engine) to flip it."
