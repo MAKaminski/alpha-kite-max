@@ -191,6 +191,16 @@ async def run_backtest(config_path: str, fixture_path: str) -> Report:
             decision, oqs, broker, risk, open_records, report, exit_pass=False
         )
 
+    # Sweep any positions still open when the fixture's bars ran out. We
+    # can't compute a realistic exit P&L without future data, so leave
+    # pnl_pct=None — the summary excludes these from win/loss/expectancy
+    # stats, but the trade ledger in the UI lists them so the user sees
+    # entries fired even if the fixture was too short for an exit.
+    for _intent_id, rec in list(open_records.items()):
+        rec.reason = "open_at_fixture_end"
+        report.trades.append(rec)
+    open_records.clear()
+
     await broker.disconnect()
     return report
 
