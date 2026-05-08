@@ -97,17 +97,6 @@ export default function PriceChart({
         horzLines: { color: "#f3f4f6" },
       },
       crosshair: { mode: CrosshairMode.Normal },
-      // Price (candles + SMA + VWAP) lives on the right scale; volume gets
-      // its own visible LEFT scale so the user can read raw share counts.
-      rightPriceScale: {
-        borderColor: "#e5e7eb",
-        scaleMargins: { top: 0.05, bottom: 0.25 },
-      },
-      leftPriceScale: {
-        visible: true,
-        borderColor: "#e5e7eb",
-        scaleMargins: { top: 0.75, bottom: 0 },
-      },
       timeScale: {
         borderColor: "#e5e7eb",
         timeVisible: true,
@@ -123,6 +112,7 @@ export default function PriceChart({
       borderDownColor: "#ef4444",
       wickUpColor: "#10b981",
       wickDownColor: "#ef4444",
+      priceScaleId: "right",
     }) as ISeriesApi<"Candlestick">;
 
     const smaSeries = chart.addLineSeries({
@@ -131,6 +121,7 @@ export default function PriceChart({
       priceLineVisible: false,
       lastValueVisible: true,
       title: `SMA${smaPeriod}`,
+      priceScaleId: "right",
     });
 
     const vwapSeries = chart.addLineSeries({
@@ -139,16 +130,31 @@ export default function PriceChart({
       priceLineVisible: false,
       lastValueVisible: true,
       title: "VWAP",
+      priceScaleId: "right",
     });
 
-    // Volume histogram bound to the LEFT price scale so the user can read
-    // raw share counts off the axis labels. The leftPriceScale options
-    // above already pin its drawing to the bottom 25% of the chart.
+    // Volume histogram on its own LEFT axis so the user can read raw share
+    // counts off the axis labels. The series MUST exist before we can call
+    // applyOptions on the 'left' scale, so order matters here.
     const volumeSeries = chart.addHistogramSeries({
       priceFormat: { type: "volume" },
       priceScaleId: "left",
       priceLineVisible: false,
       lastValueVisible: false,
+    });
+
+    // Configure the two price scales after their series exist. Doing it
+    // here (not in createChart options) is the lightweight-charts v4
+    // pattern that actually applies — passing leftPriceScale.visible:
+    // true to createChart() doesn't always render the axis on its own.
+    chart.priceScale("right").applyOptions({
+      borderColor: "#e5e7eb",
+      scaleMargins: { top: 0.05, bottom: 0.30 },
+    });
+    chart.priceScale("left").applyOptions({
+      visible: true,
+      borderColor: "#e5e7eb",
+      scaleMargins: { top: 0.75, bottom: 0 },
     });
 
     if (bars.length > 0) {

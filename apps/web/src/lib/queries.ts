@@ -351,7 +351,12 @@ function stringifyMetadata(
   return out;
 }
 
-function mapPosition(row: PositionRow): Position {
+function mapPosition(
+  row: PositionRow,
+  enteredAt: string | null = null,
+  entryPrice: string | null = null,
+  isFixture: boolean = false,
+): Position {
   const option = row.is_option
     ? {
         underlying: row.symbol,
@@ -368,6 +373,9 @@ function mapPosition(row: PositionRow): Position {
     avgCost: toStr(row.avg_cost),
     marketValue: toStrOrNull(row.market_value),
     unrealizedPnl: toStrOrNull(row.unrealized_pnl),
+    enteredAt,
+    entryPrice,
+    isFixture,
   };
 }
 
@@ -421,10 +429,13 @@ export async function fetchSignals(limit = 100): Promise<Signal[]> {
   return (data ?? []).map((r) => mapSignal(r as SignalRow));
 }
 
-/** Open positions (quantity != 0). */
+/** Open positions (quantity != 0). Joins the earliest matching BUY fill so
+ *  we can show "entered at" + entry price next to avg_cost. */
 export async function fetchOpenPositions(): Promise<Position[]> {
   const supa = getSupabase();
-  if (!supa) return POSITION_FIXTURES;
+  if (!supa) {
+    return POSITION_FIXTURES.map((p) => ({ ...p, isFixture: true }));
+  }
 
   const { data, error } = await supa
     .from("positions")
@@ -438,7 +449,60 @@ export async function fetchOpenPositions(): Promise<Position[]> {
     console.error("[queries] fetchOpenPositions failed:", error.message);
     return [];
   }
-  return (data ?? []).map((r) => mapPosition(r as PositionRow));
+  const positions = (data ?? []) as PositionRow[];
+  if (positions.length === 0) return [];
+
+  // Pull the earliest BUY fill per contract so we can attach an entry
+  // timestamp + entry price. One round-trip; we filter by symbols.
+  const symbols = Array.from(new Set(positions.map((p) => p.symbol)));
+  const { data: fillRows } = await supa
+    .from("fills")
+    .select("ts,symbol,side,price,is_option,option_expiry,option_strike,option_right")
+    .in("symbol", symbols)
+    .eq("side", "BUY")
+    .order("ts", { ascending: true });
+
+  const firstBuy = new Map<string, { ts: string; price: string }>();
+  for (const f of (fillRows ?? []) as Array<{
+    ts: string; symbol: string; side: string; price: string | number;
+    is_option: boolean; option_expiry: string | null;
+    option_strike: string | number | null; option_right: string | null;
+  }>) {
+    const k = positionKey({
+      symbol: f.symbol,
+      is_option: f.is_option,
+      option_expiry: f.option_expiry,
+      option_strike: f.option_strike,
+      option_right: f.option_right,
+    });
+    if (!firstBuy.has(k)) {
+      firstBuy.set(k, { ts: f.ts, price: toStr(f.price) });
+    }
+  }
+
+  return positions.map((r) => {
+    const k = positionKey(r);
+    const entry = firstBuy.get(k) ?? null;
+    return mapPosition(r, entry?.ts ?? null, entry?.price ?? null, false);
+  });
+}
+
+function positionKey(p: {
+  symbol: string;
+  is_option: boolean;
+  option_expiry: string | null;
+  option_strike: string | number | null;
+  option_right: string | null;
+}): string {
+  return [
+    p.symbol,
+    p.is_option ? "OPT" : "EQ",
+    p.option_expiry ?? "",
+    p.option_strike !== null && p.option_strike !== undefined
+      ? String(p.option_strike)
+      : "",
+    p.option_right ?? "",
+  ].join("|");
 }
 
 /** Trailing N daily P&L rows, oldest → newest (for sparkline). */
@@ -460,6 +524,66 @@ export async function fetchDailyPnl(limit = 30): Promise<DailyPnl[]> {
   }
   // We fetched newest-first to use the index; reverse for display/sparkline.
   return (data ?? []).map((r) => mapDailyPnl(r as DailyPnlRow)).reverse();
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// /pnl drill-down — fills grouped by trading day so users can expand a
+// daily-P&L row and see every individual buy/sell with its timestamp.
+// ─────────────────────────────────────────────────────────────────────────
+
+export interface FillRecord {
+  ts: string;                    // ISO timestamp
+  symbol: string;
+  side: "BUY" | "SELL" | string; // string fallback for forward-compat
+  quantity: number;
+  price: string;
+  isOption: boolean;
+  optionExpiry: string | null;
+  optionStrike: string | null;
+  optionRight: string | null;
+}
+
+/** Fetch all fills in [sinceDay, today], oldest → newest. Caller groups. */
+export async function fetchFillsSince(sinceDay: string): Promise<FillRecord[]> {
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  const sinceIso = `${sinceDay}T00:00:00Z`;
+  const { data, error } = await supabase
+    .from("fills")
+    .select(
+      "ts,symbol,side,quantity,price,is_option,option_expiry,option_strike,option_right",
+    )
+    .gte("ts", sinceIso)
+    .order("ts", { ascending: true });
+  if (error || !data) return [];
+  return (
+    data as Array<{
+      ts: string;
+      symbol: string;
+      side: string;
+      quantity: number;
+      price: string | number;
+      is_option: boolean;
+      option_expiry: string | null;
+      option_strike: string | number | null;
+      option_right: string | null;
+    }>
+  ).map((r) => ({
+    ts: r.ts,
+    symbol: r.symbol,
+    side: r.side,
+    quantity: r.quantity,
+    price: typeof r.price === "string" ? r.price : String(r.price),
+    isOption: r.is_option,
+    optionExpiry: r.option_expiry,
+    optionStrike:
+      r.option_strike === null || r.option_strike === undefined
+        ? null
+        : typeof r.option_strike === "string"
+          ? r.option_strike
+          : String(r.option_strike),
+    optionRight: r.option_right,
+  }));
 }
 
 /** Last `limit` audit rows; optional severity filter. */
@@ -696,6 +820,9 @@ const POSITION_FIXTURES: Position[] = [
     avgCost: "508.42",
     marketValue: "51210.00",
     unrealizedPnl: "368.00",
+    enteredAt: "2026-05-06T13:42:00Z",
+    entryPrice: "508.42",
+    isFixture: true,
   },
   {
     symbol: "SPY",
@@ -710,6 +837,9 @@ const POSITION_FIXTURES: Position[] = [
     avgCost: "3.40",
     marketValue: "1825.00",
     unrealizedPnl: "125.00",
+    enteredAt: "2026-05-07T14:02:00Z",
+    entryPrice: "3.40",
+    isFixture: true,
   },
 ];
 

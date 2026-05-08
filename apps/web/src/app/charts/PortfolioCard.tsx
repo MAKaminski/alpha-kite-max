@@ -124,14 +124,25 @@ export default function PortfolioCard({ snapshot, positions }: Props) {
               const label = p.isOption && p.option
                 ? `${p.symbol} ${p.option.expiry} ${p.option.strike}${p.option.right}`
                 : p.symbol;
+              const entered = p.enteredAt
+                ? new Date(p.enteredAt).toISOString().slice(0, 16).replace("T", " ") + "Z"
+                : null;
               return (
-                <li key={`${label}-${i}`} className="flex justify-between">
-                  <span className="font-mono">{label}</span>
+                <li key={`${label}-${i}`} className="flex flex-wrap justify-between gap-1">
+                  <span className="font-mono">
+                    {label}
+                    {p.isFixture && (
+                      <span className="ml-2 rounded bg-yellow-100 px-1 py-px text-[10px] uppercase text-yellow-800">
+                        demo
+                      </span>
+                    )}
+                  </span>
                   <span className="text-gray-500">
-                    qty {p.quantity} · cost {fmtUsd(p.avgCost)}
+                    qty {p.quantity} · entry {fmtUsd(p.entryPrice ?? p.avgCost)}
+                    {entered && <span className="ml-2 text-gray-400">@ {entered}</span>}
                     {p.unrealizedPnl !== null && (
-                      <span className={Number(p.unrealizedPnl) >= 0 ? " text-emerald-700" : " text-red-700"}>
-                        {" "}({fmtUsd(p.unrealizedPnl)})
+                      <span className={Number(p.unrealizedPnl) >= 0 ? " ml-2 text-emerald-700" : " ml-2 text-red-700"}>
+                        ({fmtUsd(p.unrealizedPnl)})
                       </span>
                     )}
                   </span>

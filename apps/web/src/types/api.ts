@@ -104,6 +104,12 @@ export interface Position {
   avgCost: string;
   marketValue: string | null;
   unrealizedPnl: string | null;
+  /** ISO timestamp of the earliest BUY fill for this contract (null if unknown). */
+  enteredAt: string | null;
+  /** Price of the earliest BUY fill (== avgCost for single-fill entries). */
+  entryPrice: string | null;
+  /** True iff this row was returned from local fixtures (Supabase unconfigured). */
+  isFixture: boolean;
 }
 
 export interface AccountSummary {

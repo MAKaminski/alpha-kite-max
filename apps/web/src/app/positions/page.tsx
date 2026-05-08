@@ -3,7 +3,7 @@ import { Table, type Column } from "@/components/Table";
 import { Empty } from "@/components/Empty";
 import { Stat } from "@/components/Stat";
 import { fetchOpenPositions } from "@/lib/queries";
-import { fmtDate, fmtInt, fmtUsd, fmtUsdPrecise } from "@/lib/format";
+import { fmtDate, fmtInt, fmtTime, fmtUsd, fmtUsdPrecise } from "@/lib/format";
 import type { Position } from "@/types/api";
 
 export const dynamic = "force-dynamic";
@@ -50,9 +50,24 @@ export default async function PositionsPage() {
       cell: (p) => fmtInt(p.quantity),
     },
     {
-      header: "Avg Cost",
+      header: "Entry price",
+      align: "right",
+      cell: (p) => (p.entryPrice ? fmtUsdPrecise(p.entryPrice) : fmtUsdPrecise(p.avgCost)),
+    },
+    {
+      header: "Avg cost",
       align: "right",
       cell: (p) => fmtUsdPrecise(p.avgCost),
+    },
+    {
+      header: "Entered",
+      align: "right",
+      cell: (p) =>
+        p.enteredAt ? (
+          <span className="font-mono text-xs">{fmtTime(p.enteredAt)}</span>
+        ) : (
+          <span className="text-[var(--muted)]">—</span>
+        ),
     },
     {
       header: "Mkt Value",
@@ -66,6 +81,8 @@ export default async function PositionsPage() {
     },
   ];
 
+  const allFixture = positions.length > 0 && positions.every((p) => p.isFixture);
+
   const unrealizedTone =
     totalUnrealized > 0 ? "positive" : totalUnrealized < 0 ? "negative" : "neutral";
 
@@ -74,6 +91,14 @@ export default async function PositionsPage() {
       <Nav current="/positions" />
       <main className="mx-auto max-w-6xl px-6 py-8">
         <h1 className="mb-4 text-xl font-semibold">Positions</h1>
+        {allFixture && (
+          <div className="mb-4 rounded-md border border-yellow-300 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
+            <span className="font-medium">Demo data.</span>{" "}
+            Supabase env vars (NEXT_PUBLIC_SUPABASE_URL +
+            NEXT_PUBLIC_SUPABASE_ANON_KEY) aren&apos;t configured for this page,
+            so these rows are local fixtures — not real holdings.
+          </div>
+        )}
         <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Stat label="Open positions" value={fmtInt(positions.length)} />
           <Stat label="Total market value" value={fmtUsd(totalMarketValue)} />
