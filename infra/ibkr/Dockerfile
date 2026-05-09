@@ -37,11 +37,28 @@ FROM gnzsnz/ib-gateway:stable
 # Note: gnzsnz/ib-gateway:stable ends with `USER ibgateway`, so RUN steps
 # in this Dockerfile execute as that unprivileged user by default and
 # cannot write to /usr/local/bin/. Switch to root for the build and stay
-# as root through runtime — gnzsnz's /root/scripts/run.sh is owned by
-# root and not other-readable, so the entrypoint MUST run as root too.
+# as root through runtime — gnzsnz's run.sh entrypoint is owned by root
+# and not other-readable, so the wrapper MUST run as root too.
 # Java/IB Gateway is launched under the ibgateway user via su/gosu inside
 # run.sh itself, so end-user code still runs unprivileged.
 USER root
+
+# The path to gnzsnz's run.sh has moved across image versions
+# (/root/scripts/run.sh historically, but newer stables drop it elsewhere).
+# Resolve at build time and store the path so the runtime wrapper does
+# not have to guess.
+RUN GNZSNZ_RUN_SH="$( \
+      find / -type f -name run.sh -executable 2>/dev/null \
+      | grep -E '(scripts|gnzsnz)' \
+      | head -1 \
+    )" && \
+    if [ -z "$GNZSNZ_RUN_SH" ]; then \
+      GNZSNZ_RUN_SH="$(find / -type f -name run.sh -executable 2>/dev/null | head -1)"; \
+    fi && \
+    test -n "$GNZSNZ_RUN_SH" && \
+    echo "[build] resolved gnzsnz entrypoint: $GNZSNZ_RUN_SH" && \
+    echo "$GNZSNZ_RUN_SH" > /usr/local/etc/gnzsnz-run-sh.path
+
 RUN cat > /usr/local/bin/patch-trusted-ips.sh <<'EOF' && chmod +x /usr/local/bin/patch-trusted-ips.sh
 #!/usr/bin/env bash
 set -euo pipefail
@@ -60,11 +77,24 @@ for _ in {1..120}; do
 done
 EOF
 
+RUN cat > /usr/local/bin/start-with-patcher.sh <<'EOF' && chmod +x /usr/local/bin/start-with-patcher.sh
+#!/usr/bin/env bash
+set -euo pipefail
+/usr/local/bin/patch-trusted-ips.sh &
+RUN_SH="$(cat /usr/local/etc/gnzsnz-run-sh.path 2>/dev/null || true)"
+if [ -z "$RUN_SH" ] || [ ! -x "$RUN_SH" ]; then
+  echo "[start-with-patcher] FATAL: gnzsnz run.sh not found at '$RUN_SH'" >&2
+  exit 1
+fi
+echo "[start-with-patcher] exec $RUN_SH"
+exec "$RUN_SH" "$@"
+EOF
+
 # Wrap the gnzsnz entrypoint: kick off the patcher in the background, then
 # exec the upstream script. The patcher polls and rewrites jts.ini repeatedly
 # so a daily IBKR-forced relogin (which can regenerate the file) does not
 # silently restore TrustedIPs=127.0.0.1.
-ENTRYPOINT ["/bin/bash", "-c", "/usr/local/bin/patch-trusted-ips.sh & exec /root/scripts/run.sh \"$@\"", "--"]
+ENTRYPOINT ["/usr/local/bin/start-with-patcher.sh"]
 
 # Paper-trading port. We deliberately do NOT expose 4001 (live).
 EXPOSE 4002
