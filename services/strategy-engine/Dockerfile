@@ -17,7 +17,7 @@ WORKDIR /app
 # manylinux cp311 wheels.
 COPY --link pyproject.toml uv.lock README.md ./
 
-RUN --mount=type=cache,target=/root/.cache/uv \
+RUN --mount=type=cache,id=s/7e0829de-28c2-4564-b4d5-55df1ce5dab7-/root/.cache/uv,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-install-project
 
 # --- runtime: minimal image, only what's needed at runtime --------------------
