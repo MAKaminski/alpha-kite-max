@@ -59,26 +59,41 @@ RUN GNZSNZ_RUN_SH="$( \
     echo "[build] resolved gnzsnz entrypoint: $GNZSNZ_RUN_SH" && \
     echo "$GNZSNZ_RUN_SH" > /usr/local/etc/gnzsnz-run-sh.path
 
-# Patch every file under the image that hardcodes TrustedIPs=127.0.0.1
-# (the gnzsnz scripts and any jts.ini templates they ship with). IB Gateway
-# reads jts.ini once on startup and never reloads it, so changing the file
-# AFTER the gateway has started is too late — by then the in-memory
-# whitelist already says "only allow 127.0.0.1" and the connection from
-# the strategy-engine container gets dropped 3ms after TCP-accept.
-#
-# Doing this at build time means run.sh writes TrustedIPs=* into jts.ini
-# the very first time it runs, so the gateway boots with the right value.
-RUN grep -rln 'TrustedIPs=127\.0\.0\.1' / 2>/dev/null \
-      | while IFS= read -r f; do \
-          sed -i 's|TrustedIPs=127\.0\.0\.1|TrustedIPs=*|g' "$f" && \
-          echo "[build] patched TrustedIPs in $f"; \
-        done
+# IB Gateway reads jts.ini once at boot and never reloads it; patching
+# the file AFTER the gateway has started is too late. The previous
+# attempt (grep+sed for "TrustedIPs=127.0.0.1") found nothing because
+# gnzsnz constructs that line from a variable -- the literal string is
+# never on disk pre-startup. Take a different angle: pre-bake jts.ini
+# at build time with all the minimal lines IBC requires (per its
+# startup log, it ensures these are present and only ADDS missing
+# lines, never replaces existing values). When IBC's "ensure minimal
+# lines" check runs, every line is already there -- including
+# TrustedIPs=* -- so it leaves the file alone and the gateway boots
+# with the open whitelist.
+RUN mkdir -p /home/ibgateway/Jts && \
+    cat > /home/ibgateway/Jts/jts.ini <<'EOF'
+[Logon]
+s3store=true
+Locale=en
+displayedproxymsg=1
+UseSSL=true
+
+[IBGateway]
+ApiOnly=true
+TrustedIPs=*
+EOF
+
+RUN chown -R ibgateway:ibgateway /home/ibgateway/Jts && \
+    chmod 644 /home/ibgateway/Jts/jts.ini && \
+    echo "[build] pre-baked /home/ibgateway/Jts/jts.ini:" && \
+    cat /home/ibgateway/Jts/jts.ini
 
 RUN cat > /usr/local/bin/patch-trusted-ips.sh <<'EOF' && chmod +x /usr/local/bin/patch-trusted-ips.sh
 #!/usr/bin/env bash
 # Belt-and-braces: keep watching jts.ini and re-apply TrustedIPs=* if a
 # daily IBKR-forced relogin or some unexpected codepath ever rewrites the
-# file with the old value. The build-time sed handles the common path.
+# file with the old value. The build-time pre-bake handles the common
+# path; this watcher is just a safety net.
 set -euo pipefail
 JTS_INI=/home/ibgateway/Jts/jts.ini
 for _ in {1..120}; do
@@ -97,6 +112,11 @@ EOF
 RUN cat > /usr/local/bin/start-with-patcher.sh <<'EOF' && chmod +x /usr/local/bin/start-with-patcher.sh
 #!/usr/bin/env bash
 set -euo pipefail
+# Diagnostic: dump jts.ini state so we can see in the runtime log
+# whether the pre-bake survived gnzsnz's startup.
+echo "[start-with-patcher] pre-run jts.ini contents:"
+cat /home/ibgateway/Jts/jts.ini 2>&1 | sed 's/^/[start-with-patcher]   /' || \
+  echo "[start-with-patcher]   (no jts.ini yet)"
 /usr/local/bin/patch-trusted-ips.sh &
 RUN_SH="$(cat /usr/local/etc/gnzsnz-run-sh.path 2>/dev/null || true)"
 if [ -z "$RUN_SH" ] || [ ! -x "$RUN_SH" ]; then
