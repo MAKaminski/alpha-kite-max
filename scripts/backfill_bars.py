@@ -91,9 +91,10 @@ def _fetch(symbol: str, res: Resolution) -> list[Bar]:
     import yfinance as yf
 
     LOG.info(
-        "yfinance.download(%s, period=%s, interval=%s)",
+        "yfinance.download START %s period=%s interval=%s",
         symbol, res.period, res.interval,
     )
+    fetch_start = datetime.now(UTC)
     df = yf.download(
         symbol,
         period=res.period,
@@ -102,9 +103,17 @@ def _fetch(symbol: str, res: Resolution) -> list[Bar]:
         auto_adjust=False,
         prepost=False,
     )
+    fetch_elapsed = (datetime.now(UTC) - fetch_start).total_seconds()
     if df is None or df.empty:
-        LOG.warning("no rows returned for %s @ %s", symbol, res.interval)
+        LOG.warning(
+            "yfinance.download DONE %s @ %s in %.1fs — 0 rows",
+            symbol, res.interval, fetch_elapsed,
+        )
         return []
+    LOG.info(
+        "yfinance.download DONE %s @ %s in %.1fs — %d raw rows",
+        symbol, res.interval, fetch_elapsed, len(df),
+    )
 
     if hasattr(df.columns, "nlevels") and df.columns.nlevels > 1:
         # When given a single ticker, newer yfinance versions emit a MultiIndex
@@ -140,9 +149,18 @@ async def run(symbol: str, intervals: list[str], dry_run: bool) -> dict[str, int
             continue
         bars = _fetch(symbol, res)
         if bars:
+            LOG.info(
+                "supabase.upsert START %s @ %s — %d rows",
+                symbol, res.interval, len(bars),
+            )
+            write_start = datetime.now(UTC)
             await writer.write_bars(bars, feed=f"yfinance_backfill_{res.interval}")
+            write_elapsed = (datetime.now(UTC) - write_start).total_seconds()
+            LOG.info(
+                "supabase.upsert DONE  %s @ %s in %.1fs — %d rows persisted",
+                symbol, res.interval, write_elapsed, len(bars),
+            )
         counts[res.interval] = len(bars)
-        LOG.info("[%s @ %s] %d bars persisted", symbol, res.interval, len(bars))
 
     return counts
 
