@@ -59,16 +59,33 @@ RUN GNZSNZ_RUN_SH="$( \
     echo "[build] resolved gnzsnz entrypoint: $GNZSNZ_RUN_SH" && \
     echo "$GNZSNZ_RUN_SH" > /usr/local/etc/gnzsnz-run-sh.path
 
+# Patch every file under the image that hardcodes TrustedIPs=127.0.0.1
+# (the gnzsnz scripts and any jts.ini templates they ship with). IB Gateway
+# reads jts.ini once on startup and never reloads it, so changing the file
+# AFTER the gateway has started is too late — by then the in-memory
+# whitelist already says "only allow 127.0.0.1" and the connection from
+# the strategy-engine container gets dropped 3ms after TCP-accept.
+#
+# Doing this at build time means run.sh writes TrustedIPs=* into jts.ini
+# the very first time it runs, so the gateway boots with the right value.
+RUN grep -rln 'TrustedIPs=127\.0\.0\.1' / 2>/dev/null \
+      | while IFS= read -r f; do \
+          sed -i 's|TrustedIPs=127\.0\.0\.1|TrustedIPs=*|g' "$f" && \
+          echo "[build] patched TrustedIPs in $f"; \
+        done
+
 RUN cat > /usr/local/bin/patch-trusted-ips.sh <<'EOF' && chmod +x /usr/local/bin/patch-trusted-ips.sh
 #!/usr/bin/env bash
+# Belt-and-braces: keep watching jts.ini and re-apply TrustedIPs=* if a
+# daily IBKR-forced relogin or some unexpected codepath ever rewrites the
+# file with the old value. The build-time sed handles the common path.
 set -euo pipefail
 JTS_INI=/home/ibgateway/Jts/jts.ini
-# Keep watching: gnzsnz/IBC may rewrite jts.ini on relogin.
 for _ in {1..120}; do
   if [ -f "$JTS_INI" ] && grep -q '^TrustedIPs=' "$JTS_INI"; then
     if ! grep -q '^TrustedIPs=\*' "$JTS_INI"; then
       sed -i 's|^TrustedIPs=.*|TrustedIPs=*|' "$JTS_INI"
-      echo "[patch-trusted-ips] set TrustedIPs=* in $JTS_INI"
+      echo "[patch-trusted-ips] re-set TrustedIPs=* in $JTS_INI"
     fi
     sleep 5
     continue
