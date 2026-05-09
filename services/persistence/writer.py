@@ -58,21 +58,37 @@ class PersistenceWriter:
         await self._backend.insert("ticks", [row])
 
     async def write_bar(self, bar: Bar, feed: str) -> None:
-        row = {
-            "symbol": bar.symbol,
-            "interval_seconds": bar.interval_seconds,
-            "open_time": bar.open_time,
-            "open": _dec_str(bar.open),
-            "high": _dec_str(bar.high),
-            "low": _dec_str(bar.low),
-            "close": _dec_str(bar.close),
-            "volume": bar.volume,
-            "vwap": _dec_str(bar.vwap),
-            "feed": feed,
-        }
+        await self.write_bars([bar], feed)
+
+    async def write_bars(self, bars: list[Bar], feed: str) -> None:
+        """Bulk-write bars in a single batched upsert.
+
+        Use this from any caller that has more than a handful of bars to
+        persist (e.g. ``scripts/backfill_bars.py``). The writer hands every
+        row to ``backend.upsert`` which then collapses them into 500-row
+        multi-row INSERTs — orders of magnitude faster than one upsert per
+        bar over the public internet.
+        """
+        if not bars:
+            return
+        rows = [
+            {
+                "symbol": b.symbol,
+                "interval_seconds": b.interval_seconds,
+                "open_time": b.open_time,
+                "open": _dec_str(b.open),
+                "high": _dec_str(b.high),
+                "low": _dec_str(b.low),
+                "close": _dec_str(b.close),
+                "volume": b.volume,
+                "vwap": _dec_str(b.vwap),
+                "feed": feed,
+            }
+            for b in bars
+        ]
         await self._backend.upsert(
             "bars",
-            [row],
+            rows,
             conflict_columns=["symbol", "interval_seconds", "open_time"],
         )
 
