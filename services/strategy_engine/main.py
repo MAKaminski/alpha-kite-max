@@ -168,8 +168,22 @@ async def run(cfg: StrategyConfig) -> None:
     storage = _build_storage()
     writer = PersistenceWriter(storage)
 
-    equity_feed = make_feed(cfg.data)
-    options_feed = make_options_feed(cfg.data, equity_feed)
+    # Feed and broker share the same IB Gateway endpoint, but need different
+    # clientIds when both are connected (broker uses cfg.broker.client_id).
+    feed_client_id = cfg.broker.client_id + 1
+    equity_feed = make_feed(
+        cfg.data,
+        ibkr_host=cfg.broker.host,
+        ibkr_port=cfg.broker.port,
+        ibkr_client_id=feed_client_id,
+    )
+    options_feed = make_options_feed(
+        cfg.data,
+        equity_feed,
+        ibkr_host=cfg.broker.host,
+        ibkr_port=cfg.broker.port,
+        ibkr_client_id=feed_client_id,
+    )
     strategy = _build_strategy(cfg)
     risk = _build_risk_pipeline(cfg)
     broker = _build_broker(cfg)
