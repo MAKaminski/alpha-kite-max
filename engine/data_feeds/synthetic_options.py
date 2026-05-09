@@ -16,7 +16,6 @@ from contracts.data_feed import (
     OptionRight,
     Quote,
 )
-from scipy.stats import norm
 
 from engine.data_feeds.base import BaseFeed
 
@@ -25,6 +24,16 @@ from engine.data_feeds.base import BaseFeed
 _EXPIRY_UTC_HOUR = 20
 _SECONDS_PER_YEAR = 365 * 86400
 _MIN_T_SECONDS = 60
+_INV_SQRT_2 = 1.0 / math.sqrt(2.0)
+_INV_SQRT_2PI = 1.0 / math.sqrt(2.0 * math.pi)
+
+
+def _norm_cdf(x: float) -> float:
+    return 0.5 * (1.0 + math.erf(x * _INV_SQRT_2))
+
+
+def _norm_pdf(x: float) -> float:
+    return _INV_SQRT_2PI * math.exp(-0.5 * x * x)
 
 
 def _bs_d1_d2(s: float, k: float, t: float, r: float, sigma: float) -> tuple[float, float]:
@@ -40,8 +49,8 @@ def _bs_price(
 ) -> float:
     d1, d2 = _bs_d1_d2(s, k, t, r, sigma)
     if right == "C":
-        return s * float(norm.cdf(d1)) - k * math.exp(-r * t) * float(norm.cdf(d2))
-    return k * math.exp(-r * t) * float(norm.cdf(-d2)) - s * float(norm.cdf(-d1))
+        return s * _norm_cdf(d1) - k * math.exp(-r * t) * _norm_cdf(d2)
+    return k * math.exp(-r * t) * _norm_cdf(-d2) - s * _norm_cdf(-d1)
 
 
 def _bs_greeks(
@@ -49,21 +58,21 @@ def _bs_greeks(
 ) -> tuple[float, float, float, float]:
     """Return (delta, gamma, theta_per_day, vega_per_1pct)."""
     d1, d2 = _bs_d1_d2(s, k, t, r, sigma)
-    pdf_d1 = float(norm.pdf(d1))
+    pdf_d1 = _norm_pdf(d1)
     sqrt_t = math.sqrt(t)
     gamma = pdf_d1 / (s * sigma * sqrt_t)
     vega = s * pdf_d1 * sqrt_t  # per 1.00 change in sigma
     if right == "C":
-        delta = float(norm.cdf(d1))
+        delta = _norm_cdf(d1)
         theta = (
             -(s * pdf_d1 * sigma) / (2 * sqrt_t)
-            - r * k * math.exp(-r * t) * float(norm.cdf(d2))
+            - r * k * math.exp(-r * t) * _norm_cdf(d2)
         )
     else:
-        delta = float(norm.cdf(d1)) - 1.0
+        delta = _norm_cdf(d1) - 1.0
         theta = (
             -(s * pdf_d1 * sigma) / (2 * sqrt_t)
-            + r * k * math.exp(-r * t) * float(norm.cdf(-d2))
+            + r * k * math.exp(-r * t) * _norm_cdf(-d2)
         )
     return delta, gamma, theta / 365.0, vega / 100.0
 

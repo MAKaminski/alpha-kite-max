@@ -73,6 +73,8 @@ services:
     build:
       context: .
       dockerfile: services/strategy-engine/Dockerfile
+      cache_from:
+        - alpha-kite/strategy-engine:dev
     image: alpha-kite/strategy-engine:dev
     env_file: .env
     environment:
@@ -92,6 +94,8 @@ services:
     build:
       context: .
       dockerfile: services/market-data-stream/Dockerfile
+      cache_from:
+        - alpha-kite/market-data-stream:dev
     image: alpha-kite/market-data-stream:dev
     env_file: .env
     environment:
