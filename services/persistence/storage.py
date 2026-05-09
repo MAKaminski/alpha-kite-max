@@ -158,7 +158,27 @@ class SupabaseBackend:
                         schema="pg_catalog",
                     )
 
-            self._pool = await asyncpg.create_pool(self._dsn, init=_init_conn)
+            self._pool = await asyncpg.create_pool(
+                self._dsn,
+                init=_init_conn,
+                # Supabase's pooler (aws-*.pooler.supabase.com) is PgBouncer in
+                # transaction mode. PgBouncer doesn't support the prepared-
+                # statement cache asyncpg builds by default, so we'd hang or
+                # throw "prepared statement S_X already exists" on the second
+                # query. Disabling the cache is the documented fix.
+                statement_cache_size=0,
+                # Bound the pool so we don't exhaust Supabase's connection
+                # quota when many concurrent calls happen (e.g. the parallel
+                # broker_snapshot + audit_log fetches in the dashboard).
+                min_size=1,
+                max_size=4,
+                # Make hangs LOUD. asyncpg's defaults are no-timeout, so a
+                # network blip or pgbouncer cap silently waits forever; the
+                # backfill ran 30+ minutes that way once. 30s per statement
+                # / 10s to acquire a connection is plenty for our workload.
+                command_timeout=30,
+                timeout=10,
+            )
         return self._pool
 
     async def close(self) -> None:
