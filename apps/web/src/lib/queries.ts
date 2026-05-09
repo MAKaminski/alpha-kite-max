@@ -764,6 +764,30 @@ export async function fetchKillSwitchState(): Promise<{
   return { lastSeen: row.ts, active };
 }
 
+/** Most recent ``BACKTEST_PASS`` audit row, used by /live-enable's
+ *  "backtest passed in last 24h" gate. The Server Action behind the
+ *  /backtest page writes one of these whenever a run finishes with
+ *  positive expectancy. */
+export async function fetchRecentBacktestPass(
+  withinHours = 24,
+): Promise<{ lastSeen: string | null; passed: boolean; payload: Record<string, unknown> | null }> {
+  const supabase = getSupabase();
+  if (!supabase) return { lastSeen: null, passed: false, payload: null };
+  const cutoff = new Date(Date.now() - withinHours * 3_600_000).toISOString();
+  const { data, error } = await supabase
+    .from("audit_log")
+    .select("ts,payload")
+    .eq("event_type", "BACKTEST_PASS")
+    .gte("ts", cutoff)
+    .order("ts", { ascending: false })
+    .limit(1);
+  if (error || !data || data.length === 0) {
+    return { lastSeen: null, passed: false, payload: null };
+  }
+  const row = data[0] as { ts: string; payload: Record<string, unknown> | null };
+  return { lastSeen: row.ts, passed: true, payload: row.payload };
+}
+
 /** Most recent N bars across all symbols. Powers /status's "Live feed"
  *  panel: the initial server-render fills the ring buffer that the
  *  realtime subscription then keeps current. */
