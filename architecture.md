@@ -185,17 +185,20 @@ The CI python job's "try prebaked image" step pulls the `lock-<hash>` tag, so a 
 
 **First run requires GHCR write permission** in the repo settings (Settings → Actions → General → Workflow permissions → "Read and write permissions").
 
-### Vercel (`apps/web/vercel.json` + `next.config.mjs`)
+### Vercel (`apps/web/vercel.json`)
 
 ```json
-{ "buildCommand": "next build --turbopack", "installCommand": "npm ci --no-audit --no-fund" }
+{ "buildCommand": "next build", "installCommand": "npm ci --no-audit --no-fund" }
 ```
 
-```js
-const nextConfig = { output: 'standalone', reactStrictMode: true };
-```
+`npm ci` is deterministic and marginally faster than `npm install` — that's the only change worth making for Vercel. Vercel already caches `.next/cache` automatically.
 
-`output: 'standalone'` reduces deploy size; Turbopack (`next build --turbopack`) is GA in Next 15.5+ and ~30% faster than webpack. Vercel already caches `.next/cache` automatically — realistic ceiling here is ~2×. If a deploy preview breaks under Turbopack, drop the `--turbopack` flag and keep the rest.
+**Two settings to *not* enable for Vercel** (we tried, they regress):
+
+- `output: 'standalone'` is for self-hosted/Docker deploys. Vercel uses its own Build Output API and ignores `.next/standalone`, but you still pay the file-tracing + node_modules-copy cost during build. Measured: ~50% slower Vercel builds.
+- `next build --turbopack` is fine for `next dev` (HMR) but on Vercel the platform's build cache is tuned for the webpack output shape — switching to Turbopack invalidates large parts of that incremental cache, making warm builds more cold-like.
+
+Both are appropriate if/when the web app is ever containerized and run outside Vercel.
 
 ### Railway (`infra/railway/*.json`)
 
