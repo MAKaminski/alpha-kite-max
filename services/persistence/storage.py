@@ -189,10 +189,20 @@ class SupabaseBackend:
         rows: list[dict[str, Any]],
         conflict_columns: list[str],
     ) -> None:
+        """Bulk upsert into Postgres in batches of 500 multi-row VALUES.
+
+        Network-bound workloads (e.g. the historical backfill from a laptop
+        to Supabase across the public internet) become brutally slow when
+        each row is its own statement — every INSERT eats one round-trip,
+        so 13k rows * 50ms RTT ~= 11 minutes. Collapsing into multi-row
+        VALUES statements brings that down to ~28 round-trips for the same
+        13k rows. Same on-conflict semantics either way.
+        """
         if not rows:
             return
         pool = await self._ensure_pool()
         cols = list(rows[0].keys())
+        n_cols = len(cols)
         col_sql = ", ".join(f'"{c}"' for c in cols)
         conflict_sql = ", ".join(f'"{c}"' for c in conflict_columns)
         update_cols = [c for c in cols if c not in conflict_columns]
@@ -201,14 +211,30 @@ class SupabaseBackend:
             on_conflict = f"ON CONFLICT ({conflict_sql}) DO UPDATE SET {set_sql}"
         else:
             on_conflict = f"ON CONFLICT ({conflict_sql}) DO NOTHING"
+
+        # 500 rows per statement keeps us comfortably under Postgres's
+        # 65535-parameter cap (with 11 columns per row that's 5500 params).
+        BATCH_SIZE = 500
         async with pool.acquire() as conn:
-            for row in rows:
-                values = [row.get(c) for c in cols]
-                ph = self._placeholders(1, len(cols))
+            for start in range(0, len(rows), BATCH_SIZE):
+                batch = rows[start : start + BATCH_SIZE]
+                value_groups: list[str] = []
+                values_flat: list[Any] = []
+                for j, row in enumerate(batch):
+                    base = j * n_cols
+                    placeholders = ", ".join(
+                        f"${base + k + 1}" for k in range(n_cols)
+                    )
+                    value_groups.append(f"({placeholders})")
+                    for c in cols:
+                        values_flat.append(row.get(c))
                 sql = (
-                    f'INSERT INTO "{table}" ({col_sql}) VALUES ({ph}) {on_conflict}'
+                    f'INSERT INTO "{table}" ({col_sql}) VALUES '
+                    + ", ".join(value_groups)
+                    + " "
+                    + on_conflict
                 )
-                await conn.execute(sql, *values)
+                await conn.execute(sql, *values_flat)
 
     async def select(
         self,

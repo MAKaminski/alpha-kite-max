@@ -139,10 +139,10 @@ async def run(symbol: str, intervals: list[str], dry_run: bool) -> dict[str, int
         if res.interval not in intervals:
             continue
         bars = _fetch(symbol, res)
-        for bar in bars:
-            await writer.write_bar(bar, feed=f"yfinance_backfill_{res.interval}")
+        if bars:
+            await writer.write_bars(bars, feed=f"yfinance_backfill_{res.interval}")
         counts[res.interval] = len(bars)
-        LOG.info("[%s @ %s] %d bars written", symbol, res.interval, len(bars))
+        LOG.info("[%s @ %s] %d bars persisted", symbol, res.interval, len(bars))
 
     return counts
 
