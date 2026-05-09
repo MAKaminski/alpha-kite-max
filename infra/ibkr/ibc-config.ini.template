@@ -23,6 +23,14 @@ DismissNSEComplianceNotice=yes
 DismissPasswordExpiryWarning=yes
 ReadOnlyApi=no
 
+# When IBKR detects another login under the same user (TWS Desktop, web client,
+# another IBC instance, etc.), IB pops a modal asking which session wins. With
+# the default value `manual`, IBC blocks waiting for a human click and the API
+# port never opens. `primary` tells IBC to take over the new session and force
+# the other one to disconnect — the right choice for a headless paper-trading
+# container. Allowed values: primary | primaryoverride | secondary | manual.
+ExistingSessionDetectedAction=primary
+
 # ── Daily session reset ────────────────────────────────────────────────────
 # IBKR forces a daily restart at 23:50 ET. IBC handles the relogin automatically
 # and we additionally rely on the docker healthcheck to bounce the container if
