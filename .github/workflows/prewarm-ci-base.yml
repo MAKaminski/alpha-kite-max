@@ -1,0 +1,46 @@
+name: prewarm ci base image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/prewarm-ci-base.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: lowercase owner
+        id: owner
+        run: echo "lc=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: log in to ghcr
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: set up buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: build & push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: .github/ci-base.Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ steps.owner.outputs.lc }}/alpha-kite-ci-base:latest
+            ghcr.io/${{ steps.owner.outputs.lc }}/alpha-kite-ci-base:lock-${{ hashFiles('uv.lock') }}
+          cache-from: type=registry,ref=ghcr.io/${{ steps.owner.outputs.lc }}/alpha-kite-ci-base:cache
+          cache-to: type=registry,ref=ghcr.io/${{ steps.owner.outputs.lc }}/alpha-kite-ci-base:cache,mode=max

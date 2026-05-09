@@ -90,6 +90,11 @@ class BuyVolQQQCrossStrategy:
     """SMA9/VWAP cross long-vol strategy implementing the Strategy Protocol."""
 
     name: str = "buy_vol_qqq_cross"
+    kind: str = "bar"
+
+    def on_tick(self, ctx):
+        """Bar strategies don't act on ticks."""
+        return StrategyDecision()
 
     def __init__(
         self,
@@ -100,6 +105,8 @@ class BuyVolQQQCrossStrategy:
         profit_target_pct: Decimal = Decimal("30"),
         stop_loss_pct: Decimal = Decimal("25"),
         time_stop_minutes_before_close: int = 30,
+        entry_delay_minutes_after_open: int = 10,
+        session_open: time = time(13, 30, tzinfo=UTC),
         session_close: time = time(20, 0, tzinfo=UTC),
     ) -> None:
         if sma_period <= 0:
@@ -110,6 +117,10 @@ class BuyVolQQQCrossStrategy:
             raise ValueError(f"unknown mode: {mode!r}")
         if session_close.tzinfo is None:
             raise ValueError("session_close must be timezone-aware")
+        if session_open.tzinfo is None:
+            raise ValueError("session_open must be timezone-aware")
+        if entry_delay_minutes_after_open < 0:
+            raise ValueError("entry_delay_minutes_after_open must be >= 0")
 
         self.symbol = symbol
         self.sma_period = sma_period
@@ -118,6 +129,8 @@ class BuyVolQQQCrossStrategy:
         self.profit_target_pct = Decimal(profit_target_pct)
         self.stop_loss_pct = Decimal(stop_loss_pct)
         self.time_stop_minutes_before_close = time_stop_minutes_before_close
+        self.entry_delay_minutes_after_open = entry_delay_minutes_after_open
+        self.session_open = session_open
         self.session_close = session_close
 
         self._bars: list[Bar] = []
@@ -139,6 +152,23 @@ class BuyVolQQQCrossStrategy:
         close_dt = self._session_close_dt(now)
         cutoff = close_dt - timedelta(minutes=self.time_stop_minutes_before_close)
         return now >= cutoff
+
+    def _session_open_dt(self, now: datetime) -> datetime:
+        return datetime.combine(now.date(), self.session_open)
+
+    def _in_trade_window(self, now: datetime) -> bool:
+        """True iff `now` is between (open + delay) and (close - time_stop).
+
+        Used to gate signal *emission* — VWAP/SMA/cross state still update
+        outside the window so plotted data stays continuous.
+        """
+        open_dt = self._session_open_dt(now)
+        entry_open = open_dt + timedelta(minutes=self.entry_delay_minutes_after_open)
+        if now < entry_open:
+            return False
+        if self._within_time_stop(now):
+            return False
+        return True
 
     def _pick_atm_quote(
         self,
@@ -241,8 +271,10 @@ class BuyVolQQQCrossStrategy:
         if not (cross_up or cross_down):
             return StrategyDecision()
 
-        # Block entries late in the session.
-        if self._within_time_stop(ctx.now):
+        # Gate signal emission to the configured trade window: open + 10 min
+        # through close - 30 min by default. Bars/SMA/VWAP keep updating
+        # outside this band; only the signal record is suppressed.
+        if not self._in_trade_window(ctx.now):
             return StrategyDecision()
 
         # Don't double-stack — strategy-level guard in addition to the

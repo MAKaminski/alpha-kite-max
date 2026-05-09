@@ -21,10 +21,30 @@ universe:
   symbol: QQQ
 
 signal:
-  name: sma_vwap_cross
+  name: sma_vwap_cross           # sma_vwap_cross | sma_vwap_cross_tick | sell_put_qqq_cross
   params:
     sma_period: 9
     vwap_session: regular
+    # Tick-strategy params (ignored unless name=*_tick or sell_put_qqq_cross)
+    sma_window_seconds: 9
+    confirmation_seconds: 5
+    cooldown_seconds: 30          # used by sell_put_qqq_cross only
+
+# Example: short-put strategy with the user's tiered scale-out ladder.
+# Uncomment + set signal.name above to enable.
+#
+# exit:
+#   profit_target_pct: 30        # ignored by sell_put_qqq_cross
+#   stop_loss_pct: 25            # ignored by sell_put_qqq_cross
+#   time_stop_minutes_before_close: 30
+#   entry_delay_minutes_after_open: 10
+#   tiers:
+#     stop_loss_multiple: 2.0    # close all when option mid >= 2.0 * entry
+#     take_profit_tiers:
+#       - { gain_pct: 25,  qty_fraction: 0.25 }
+#       - { gain_pct: 50,  qty_fraction: 0.25 }
+#       - { gain_pct: 100, qty_fraction: 0.25 }
+#       # remaining 0.25 of the original qty runs to session close
 
 entry:
   strategy: long_vol
@@ -37,6 +57,7 @@ exit:
   profit_target_pct: 30
   stop_loss_pct: 25
   time_stop_minutes_before_close: 30
+  entry_delay_minutes_after_open: 10  # no entries in the first 10 min after open
 
 risk:
   max_open_positions: 1

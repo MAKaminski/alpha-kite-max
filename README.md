@@ -30,15 +30,14 @@ more vol than implied. Paper-trading-first, IBKR-only, code-in-repo.
 ## Quick start (15 minutes)
 
 ```bash
-# 1. clone + install
+# 1. clone + install (uv recommended — ~3× faster than pip and uses uv.lock)
 git clone https://github.com/MAKaminski/alpha-kite-max
 cd alpha-kite-max
-python -m venv .venv && source .venv/bin/activate
-pip install -e '.[dev]'
+uv sync --extra dev          # or: python -m venv .venv && pip install -e '.[dev]'
 
-# 2. run the test suite
-pytest -m "not live and not supabase"
-# 150+ tests should pass
+# 2. run the test suite (parallel via pytest-xdist)
+uv run pytest -n auto -m "not live and not supabase"
+# 170+ tests should pass in ~1s
 
 # 3. run the end-to-end backtest against a fixture
 python scripts/backtest.py \
@@ -174,10 +173,15 @@ Each guard is **fail-closed**: if it raises, the pipeline blocks.
 ### Tests
 
 ```bash
-pytest                                     # everything except live + supabase
+pytest -n auto                             # everything except live + supabase, in parallel
 pytest -m live                             # requires running IB Gateway
 pytest -m supabase                         # requires SUPABASE_DB_URL
 ```
+
+> The free dev path (`yfinance` feed, `pandas`-driven bar parsing) is in the
+> `[dev]` extra. Production installs (`pip install .` / `uv sync --no-dev`)
+> ship without `yfinance`, `pandas`, or `scipy` — the `factory.py` import is
+> lazy, so `data.feed: ibkr_live` works on a 47 MB install.
 
 ### Backtest
 
@@ -228,6 +232,26 @@ These are the human-in-the-loop steps the scaffold can't do:
       subscribe to IBKR data ($12/mo), flip `data.feed: ibkr_live`.
 
 ---
+
+## Build & deploy performance
+
+Targeted ~10–30× speedup vs the default Python/Docker setup. See
+[`architecture.md`](architecture.md) for the full picture.
+
+| Pipeline | Warm | Cold (lock changed) | Image size |
+|----------|------|---------------------|------------|
+| CI Python job | ~10–15 s | ~25 s | — |
+| CI frontend job | ~20 s | ~60 s | — |
+| Docker per-service rebuild | ~8–10 s | ~50–70 s | ~150–200 MB |
+
+Levers used:
+- **`uv.lock` + `uv sync --frozen`** — skips the resolver, ~3× faster than `pip install`.
+- **Aggressive dep prune** — dropped `python-dotenv`, `structlog`, `httpx`, `supabase` SDK, `uvloop`, `scipy`. Moved `yfinance`/`pandas` to `[dev]`. Prod install: 1.2 GB → 47 MB.
+- **Multi-stage Dockerfiles** with `FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim`, BuildKit cache mounts, and `COPY --link`.
+- **Pre-baked CI image** at `ghcr.io/<owner>/alpha-kite-ci-base:lock-<hash>` — built by `.github/workflows/prewarm-ci-base.yml` on `uv.lock` change; CI extracts the baked `.venv` before falling back to a cold install.
+- **Path-filtered CI** (`dorny/paths-filter`) — Python-only commits skip frontend job and vice versa.
+- **Railway `watchPatterns`** — most pushes trigger 0 or 1 service rebuilds instead of 3.
+- **`pytest -n auto`** — 170 tests in <1 s.
 
 ## License
 

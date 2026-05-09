@@ -1,0 +1,11 @@
+# Repo-wide sqlfluff config. The CI job at .github/workflows/ci.yml lints
+# infra/supabase/migrations against this. Goal: catch real SQL bugs (parse
+# errors, undefined references, dialect mismatches) without fighting the
+# deliberate column-aligned style used in the migration files.
+
+[sqlfluff]
+dialect = postgres
+# Layout/spacing/line-length rules disabled — migrations are hand-aligned
+# for readability. Keywords-as-identifiers disabled because `open` is a
+# legitimate column name on the `bars` table.
+exclude_rules = layout.long_lines, layout.spacing, layout.indent, references.keywords, capitalisation.keywords, capitalisation.identifiers, capitalisation.functions, capitalisation.literals, capitalisation.types

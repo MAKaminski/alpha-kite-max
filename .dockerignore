@@ -44,8 +44,12 @@ node_modules
 *.tsbuildinfo
 next-env.d.ts
 
-# Tests, docs, fixtures — not needed in runtime images
+# Tests, docs, fixtures — not needed in runtime images.
+# Keep tests/fixtures so the backtest-api sidecar (services/backtest-api/Dockerfile)
+# can serve them without bundling the test suite itself.
 tests
+!tests/fixtures
+!tests/fixtures/**
 docs
 .worktrees
 .cache_ggshield

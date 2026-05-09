@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // Server components by default; opt out where needed.
+  output: 'standalone',
   experimental: {
     typedRoutes: false,
   },

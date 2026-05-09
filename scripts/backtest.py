@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import os
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -58,31 +59,47 @@ class Report:
     trades: list[TradeRecord] = field(default_factory=list)
 
     def summary(self) -> dict:
-        closed = [t for t in self.trades if t.pnl_pct is not None]
-        wins = [t for t in closed if t.pnl_pct > 0]
-        losses = [t for t in closed if t.pnl_pct <= 0]
-        n = len(closed)
-        win_rate = (len(wins) / n) if n else 0.0
-        avg_win = (
-            float(sum(t.pnl_pct for t in wins) / len(wins)) if wins else 0.0
-        )
-        avg_loss = (
-            float(sum(t.pnl_pct for t in losses) / len(losses)) if losses else 0.0
-        )
-        expectancy = (
-            float(sum(t.pnl_pct for t in closed) / n) if n else 0.0
-        )
-        total = float(sum(t.pnl_pct for t in closed)) if closed else 0.0
+        return _summarize(self.trades)
+
+    def split(self, split_date: datetime) -> dict:
+        """Partition trades by ``entry_ts`` against ``split_date``.
+
+        Returns a dict with ``in_sample`` / ``out_of_sample`` summaries plus
+        the original ``all`` summary, so callers can render side-by-side
+        statistics without re-running the strategy.
+        """
+        in_sample = [t for t in self.trades if t.entry_ts < split_date]
+        oos = [t for t in self.trades if t.entry_ts >= split_date]
         return {
-            "trades": n,
-            "wins": len(wins),
-            "losses": len(losses),
-            "win_rate_pct": round(win_rate * 100, 2),
-            "avg_win_pct": round(avg_win, 2),
-            "avg_loss_pct": round(avg_loss, 2),
-            "expectancy_pct": round(expectancy, 2),
-            "total_pnl_pct": round(total, 2),
+            "split_date": split_date.isoformat(),
+            "all": _summarize(self.trades),
+            "in_sample": _summarize(in_sample),
+            "out_of_sample": _summarize(oos),
         }
+
+
+def _summarize(trades: list[TradeRecord]) -> dict:
+    closed = [t for t in trades if t.pnl_pct is not None]
+    wins = [t for t in closed if t.pnl_pct > 0]
+    losses = [t for t in closed if t.pnl_pct <= 0]
+    n = len(closed)
+    win_rate = (len(wins) / n) if n else 0.0
+    avg_win = float(sum(t.pnl_pct for t in wins) / len(wins)) if wins else 0.0
+    avg_loss = (
+        float(sum(t.pnl_pct for t in losses) / len(losses)) if losses else 0.0
+    )
+    expectancy = float(sum(t.pnl_pct for t in closed) / n) if n else 0.0
+    total = float(sum(t.pnl_pct for t in closed)) if closed else 0.0
+    return {
+        "trades": n,
+        "wins": len(wins),
+        "losses": len(losses),
+        "win_rate_pct": round(win_rate * 100, 2),
+        "avg_win_pct": round(avg_win, 2),
+        "avg_loss_pct": round(avg_loss, 2),
+        "expectancy_pct": round(expectancy, 2),
+        "total_pnl_pct": round(total, 2),
+    }
 
 
 async def _quote_for(
@@ -98,12 +115,47 @@ async def _quote_for(
     return None
 
 
-async def run_backtest(config_path: str, fixture_path: str) -> Report:
-    cfg = load_config(config_path)
-    LOG.info("backtest start: feed=replay fixture=%s mode=%s",
-             fixture_path, cfg.entry.mode)
+async def run_backtest(
+    config_path: str,
+    fixture_path: str | None = None,
+    *,
+    symbol: str | None = None,
+    start: datetime | None = None,
+    end: datetime | None = None,
+    interval_seconds: int = 60,
+    dsn: str | None = None,
+) -> Report:
+    """Run the configured strategy through historical bars and return a Report.
 
-    feed = ReplayFeed(fixture_path)
+    Bars source: pass ``fixture_path`` (replay JSON) OR pass ``symbol`` +
+    ``start`` + ``end`` (Supabase ``bars`` table). The DB path uses the env
+    var ``SUPABASE_DB_URL`` by default; override via ``dsn``.
+    """
+    cfg = load_config(config_path)
+
+    feed: ReplayFeed | SupabaseBarsFeed
+    if fixture_path is not None:
+        LOG.info("backtest start: source=fixture fixture=%s mode=%s",
+                 fixture_path, cfg.entry.mode)
+        feed = ReplayFeed(fixture_path)
+    else:
+        if not (symbol and start and end):
+            raise ValueError(
+                "run_backtest requires either fixture_path, or symbol+start+end",
+            )
+        from engine.data_feeds.supabase_bars import SupabaseBarsFeed
+        actual_dsn = dsn or os.getenv("SUPABASE_DB_URL")
+        if not actual_dsn:
+            raise ValueError(
+                "SUPABASE_DB_URL is not set; cannot pull bars from the database",
+            )
+        LOG.info("backtest start: source=supabase symbol=%s %s..%s @%ds mode=%s",
+                 symbol, start.isoformat(), end.isoformat(), interval_seconds,
+                 cfg.entry.mode)
+        feed = SupabaseBarsFeed(
+            actual_dsn, symbol=symbol, start=start, end=end,
+            interval_seconds=interval_seconds,
+        )
     options_feed = SyntheticOptionsFeed(feed)
     strategy = BuyVolQQQCrossStrategy(
         symbol=cfg.universe.symbol,
@@ -133,8 +185,13 @@ async def run_backtest(config_path: str, fixture_path: str) -> Report:
     open_records: dict[uuid.UUID, TradeRecord] = {}
     report = Report()
 
+    # When pulling from Supabase, use the caller-supplied interval; for
+    # fixtures the value is fixed by the JSON schema.
+    stream_interval = (
+        interval_seconds if fixture_path is None else cfg.data.bar_interval_seconds
+    )
     async for bar in feed.stream_equity_bars(
-        cfg.universe.symbol, cfg.data.bar_interval_seconds
+        cfg.universe.symbol, stream_interval
     ):
         bar_history.append(bar)
 
@@ -175,7 +232,19 @@ async def run_backtest(config_path: str, fixture_path: str) -> Report:
             decision, oqs, broker, risk, open_records, report, exit_pass=False
         )
 
+    # Sweep any positions still open when the fixture's bars ran out. We
+    # can't compute a realistic exit P&L without future data, so leave
+    # pnl_pct=None — the summary excludes these from win/loss/expectancy
+    # stats, but the trade ledger in the UI lists them so the user sees
+    # entries fired even if the fixture was too short for an exit.
+    for _intent_id, rec in list(open_records.items()):
+        rec.reason = "open_at_fixture_end"
+        report.trades.append(rec)
+    open_records.clear()
+
     await broker.disconnect()
+    if hasattr(feed, "close"):
+        await feed.close()
     return report
 
 
@@ -250,6 +319,15 @@ def main() -> None:
     parser.add_argument(
         "--fixture", default="tests/fixtures/qqq_2026-04-15_1min.json"
     )
+    parser.add_argument(
+        "--split-date",
+        default=None,
+        help=(
+            "Optional ISO timestamp (e.g. 2026-04-15T15:00Z). When set, the "
+            "backtest partitions trades into in-sample (entry_ts < split) "
+            "and out-of-sample (entry_ts >= split) and prints both reports."
+        ),
+    )
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
 
@@ -262,10 +340,22 @@ def main() -> None:
         raise SystemExit(f"fixture not found: {args.fixture}")
 
     report = asyncio.run(run_backtest(args.config, args.fixture))
-    summary = report.summary()
-    print()
-    print("──────── alpha-kite-v2 backtest report ────────")
-    print(f"fixture:    {args.fixture}")
+
+    if args.split_date is None:
+        _print_summary("backtest report", args.fixture, report.summary())
+        return
+
+    split = datetime.fromisoformat(args.split_date.replace("Z", "+00:00"))
+    parts = report.split(split)
+    print(f"\nfixture:    {args.fixture}")
+    print(f"split:      {parts['split_date']}\n")
+    _print_summary("ALL trades", args.fixture, parts["all"])
+    _print_summary("IN-SAMPLE  (entry_ts < split)", args.fixture, parts["in_sample"])
+    _print_summary("OUT-OF-SAMPLE (entry_ts >= split)", args.fixture, parts["out_of_sample"])
+
+
+def _print_summary(title: str, fixture: str, summary: dict) -> None:
+    print(f"──────── {title} ────────")
     print(f"trades:     {summary['trades']}")
     print(f"wins:       {summary['wins']}")
     print(f"losses:     {summary['losses']}")
@@ -274,10 +364,9 @@ def main() -> None:
     print(f"avg loss:   {summary['avg_loss_pct']}%")
     print(f"expectancy: {summary['expectancy_pct']}% per trade")
     print(f"total P&L:  {summary['total_pnl_pct']}%")
-    print("───────────────────────────────────────────────")
-    print()
+    print("───────────────────────────────────────────────\n")
     if summary["trades"] == 0:
-        print("(0 trades — fixture may not have produced a cross + exit pair)")
+        print("(0 trades — fixture may not have produced a cross + exit pair)\n")
 
 
 if __name__ == "__main__":

@@ -2,7 +2,16 @@
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
     "builder": "DOCKERFILE",
-    "dockerfilePath": "services/strategy-engine/Dockerfile"
+    "dockerfilePath": "services/strategy-engine/Dockerfile",
+    "watchPatterns": [
+      "contracts/**",
+      "config/**",
+      "engine/**",
+      "services/strategy_engine/**",
+      "services/strategy-engine/**",
+      "services/persistence/**",
+      "pyproject.toml"
+    ]
   },
   "deploy": {
     "startCommand": "python -m services.strategy_engine",

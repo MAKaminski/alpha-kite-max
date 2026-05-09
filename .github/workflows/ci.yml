@@ -10,33 +10,91 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: detect changed paths
+    runs-on: ubuntu-latest
+    outputs:
+      python: ${{ steps.filter.outputs.python }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      sql: ${{ steps.filter.outputs.sql }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            python:
+              - 'contracts/**'
+              - 'config/**'
+              - 'engine/**'
+              - 'services/**'
+              - 'scripts/**'
+              - 'tests/**'
+              - 'pyproject.toml'
+              - 'uv.lock'
+              - '.github/workflows/ci.yml'
+            frontend:
+              - 'apps/web/**'
+              - '.github/workflows/ci.yml'
+            sql:
+              - 'infra/supabase/migrations/**'
+              - '.github/workflows/ci.yml'
+
   python:
     name: python — ruff + pytest
+    needs: changes
+    if: needs.changes.outputs.python == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: install uv (with built-in cache)
+        uses: astral-sh/setup-uv@v3
         with:
-          python-version: "3.11"
-          cache: pip
+          enable-cache: true
+          cache-dependency-glob: uv.lock
 
-      - name: install
+      - name: setup python
+        run: uv python install 3.11
+
+      - name: cache .venv
+        id: venv-cache
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-py3.11-${{ hashFiles('uv.lock') }}
+
+      - name: try restore prebaked image (best-effort)
+        id: prebaked
+        if: steps.venv-cache.outputs.cache-hit != 'true'
+        continue-on-error: true
         run: |
-          python -m pip install --upgrade pip
-          pip install -e '.[dev]'
+          set -e
+          IMAGE="ghcr.io/${{ github.repository_owner }}/alpha-kite-ci-base:lock-${{ hashFiles('uv.lock') }}"
+          echo "Trying $IMAGE"
+          docker pull "$IMAGE" >/dev/null
+          cid=$(docker create "$IMAGE")
+          docker cp "$cid:/app/.venv" .venv
+          docker rm "$cid" >/dev/null
+          echo "restored=true" >> "$GITHUB_OUTPUT"
+
+      - name: install (cold fallback)
+        if: steps.venv-cache.outputs.cache-hit != 'true' && steps.prebaked.outputs.restored != 'true'
+        run: uv sync --frozen --extra dev
 
       - name: ruff
-        run: ruff check .
+        run: uv run ruff check .
 
-      - name: pytest
-        run: pytest -m "not live and not supabase" --maxfail=1 -q
+      - name: pytest (parallel)
+        run: uv run pytest -m "not live and not supabase" -n auto --maxfail=1 -q
 
       - name: backtest smoke
-        run: python scripts/backtest.py --config config/strategy.yaml --fixture tests/fixtures/qqq_2026-04-15_1min.json
+        run: uv run python scripts/backtest.py --config config/strategy.yaml --fixture tests/fixtures/qqq_2026-04-15_1min.json
 
   frontend:
     name: frontend — typecheck + build
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -50,8 +108,24 @@ jobs:
           cache: npm
           cache-dependency-path: apps/web/package-lock.json
 
+      - name: cache node_modules
+        id: nm-cache
+        uses: actions/cache@v4
+        with:
+          path: apps/web/node_modules
+          key: nm-${{ runner.os }}-node20-${{ hashFiles('apps/web/package-lock.json') }}
+
+      - name: cache .next
+        uses: actions/cache@v4
+        with:
+          path: apps/web/.next/cache
+          key: next-${{ runner.os }}-${{ hashFiles('apps/web/package-lock.json') }}-${{ hashFiles('apps/web/src/**', 'apps/web/next.config.mjs', 'apps/web/tailwind.config.ts') }}
+          restore-keys: |
+            next-${{ runner.os }}-${{ hashFiles('apps/web/package-lock.json') }}-
+
       - name: install
-        run: npm install --no-audit --no-fund
+        if: steps.nm-cache.outputs.cache-hit != 'true'
+        run: npm ci --no-audit --no-fund
 
       - name: type-check
         run: npx tsc --noEmit
@@ -63,14 +137,17 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy
 
   migrations:
-    name: supabase migrations — sql lint
+    name: supabase migrations — sqlfluff lint
+    needs: changes
+    if: needs.changes.outputs.sql == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: validate SQL parses
-        run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
-          for f in infra/supabase/migrations/*.sql; do
-            echo "checking $f"
-            psql --variable=ON_ERROR_STOP=1 -d "host=/tmp" -c "\\i $f" --set ON_ERROR_STOP=on || true
-          done
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: install sqlfluff
+        run: pip install 'sqlfluff>=3.0'
+      - name: lint
+        run: sqlfluff lint --dialect postgres infra/supabase/migrations

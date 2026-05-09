@@ -1,0 +1,56 @@
+# alpha-kite-v2 — Phase 3 LIVE config: IBKR real-time feed + tick strategy.
+#
+# Activate by setting STRATEGY_CONFIG=./config/strategy.live.yaml on the
+# Railway services AFTER:
+#   1. IBKR data subscriptions are active (US Equity and Options Add-On
+#      Streaming Bundle, Non-Professional)
+#   2. ibkr-gateway service is deployed and reachable on Railway's private
+#      network at host=ibkr-gateway.railway.internal:7497
+#
+# Stays in dry_run mode by default — flipping that is a separate, explicit
+# step after a full RTH session of audit-log inspection.
+
+data:
+  feed: ibkr_live
+  bar_interval_seconds: 60        # ignored when signal.name=sma_vwap_cross_tick
+  options_feed: ibkr_live
+
+broker:
+  name: ibkr
+  mode: paper
+  host: ibkr-gateway.railway.internal   # Railway private DNS
+  port: 4002                             # IB Gateway paper port (gnzsnz image)
+  client_id: 17
+  dry_run: true                          # KEEP TRUE during the first session
+  # IBKR paper accounts start with DU; the existing PaperAccountGuard already
+  # admits DU-prefixed ids without changing this allowlist.
+  paper_account_allowlist: ["DEMO", "PAPER", "DU"]
+
+universe:
+  symbol: QQQ
+
+signal:
+  name: sma_vwap_cross_tick      # tick-driven strategy with 5-sec confirmation
+  params:
+    sma_window_seconds: 9
+    confirmation_seconds: 5
+    # Bar-strategy params kept for parser compat; ignored by tick strategy.
+    sma_period: 9
+    vwap_session: regular
+
+entry:
+  strategy: long_vol
+  mode: directional
+  dte: 0
+  contracts: 1
+  max_premium_pct_nav: 0.5
+
+exit:
+  profit_target_pct: 30
+  stop_loss_pct: 25
+  time_stop_minutes_before_close: 30
+
+risk:
+  max_open_positions: 1
+  daily_loss_limit_usd: 50
+  kill_switch_file: ./KILL
