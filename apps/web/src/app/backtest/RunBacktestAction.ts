@@ -101,6 +101,17 @@ export async function runBacktest(
       return { ok: false, error: `sidecar ${res.status}: ${text}` };
     }
     const data = (await res.json()) as BacktestResult;
+
+    // Auto-write a BACKTEST_PASS audit row when the run produced closed
+    // trades with positive expectancy. /live-enable's "backtest passed in
+    // last 24h" gate queries audit_log for this event_type.
+    if (data.summary.trades > 0 && data.summary.expectancy_pct > 0) {
+      await writeBacktestPassAudit(input, data).catch(() => {
+        // Audit write is best-effort — never fail the user's backtest run
+        // because the dashboard couldn't write a row.
+      });
+    }
+
     return { ok: true, data };
   } catch (err) {
     return {
@@ -108,6 +119,44 @@ export async function runBacktest(
       error: err instanceof Error ? err.message : String(err),
     };
   }
+}
+
+async function writeBacktestPassAudit(
+  input: BacktestInput,
+  result: BacktestResult,
+): Promise<void> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  // Without service-role we can't bypass RLS to insert into audit_log.
+  // Skip silently — the rest of the dashboard still works; the gate just
+  // won't auto-flip on backtest success.
+  if (!url || !serviceKey) return;
+  const { createClient } = await import("@supabase/supabase-js");
+  const sb = createClient(url, serviceKey, { auth: { persistSession: false } });
+  const sourceLabel =
+    input.source === "fixture"
+      ? { fixture: input.fixture }
+      : {
+          symbol: input.symbol,
+          start: input.start,
+          end: input.end,
+          interval_seconds: input.intervalSeconds,
+        };
+  await sb.from("audit_log").insert({
+    actor: "dashboard:/backtest",
+    event_type: "BACKTEST_PASS",
+    severity: "INFO",
+    message: `backtest passed: ${result.summary.trades} trades, expectancy ${result.summary.expectancy_pct}%`,
+    payload: {
+      ...sourceLabel,
+      trades: result.summary.trades,
+      wins: result.summary.wins,
+      losses: result.summary.losses,
+      win_rate_pct: result.summary.win_rate_pct,
+      expectancy_pct: result.summary.expectancy_pct,
+      total_pnl_pct: result.summary.total_pnl_pct,
+    },
+  });
 }
 
 export async function listFixtures(): Promise<string[]> {

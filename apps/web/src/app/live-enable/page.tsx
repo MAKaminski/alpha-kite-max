@@ -2,6 +2,7 @@ import { Nav } from "@/components/Nav";
 import {
   fetchBrokerSnapshot,
   fetchKillSwitchState,
+  fetchRecentBacktestPass,
   fetchTodayRealizedUsd,
 } from "@/lib/queries";
 import PromoteForm from "./PromoteForm";
@@ -12,10 +13,11 @@ export const revalidate = 0;
 const DEFAULT_DAILY_LOSS_LIMIT_USD = 50;
 
 export default async function LiveEnablePage() {
-  const [brokerSnap, killSwitch, todayRealized] = await Promise.all([
+  const [brokerSnap, killSwitch, todayRealized, backtestPass] = await Promise.all([
     fetchBrokerSnapshot(),
     fetchKillSwitchState(),
     fetchTodayRealizedUsd(),
+    fetchRecentBacktestPass(24),
   ]);
 
   const lossOk = todayRealized > -DEFAULT_DAILY_LOSS_LIMIT_USD;
@@ -46,11 +48,13 @@ export default async function LiveEnablePage() {
     },
     {
       label: "Backtest passed (BACKTEST_PASS audit row in last 24h)",
-      // TODO: write the BACKTEST_PASS audit row from the /backtest UI on
-      //       success, then check it here. For now the gate is informational.
-      ok: false,
-      detail:
-        "Hook this up by writing a BACKTEST_PASS audit row from /backtest after a successful run with positive expectancy.",
+      ok: backtestPass.passed,
+      detail: backtestPass.passed
+        ? `last pass: ${new Date(backtestPass.lastSeen as string).toISOString().slice(0, 19).replace("T", " ")}Z` +
+          (typeof backtestPass.payload?.["expectancy_pct"] === "number"
+            ? ` · expectancy ${(backtestPass.payload["expectancy_pct"] as number).toFixed(2)}%`
+            : "")
+        : "Run a backtest with positive expectancy on /backtest in the last 24h to satisfy this gate.",
     },
   ];
 
