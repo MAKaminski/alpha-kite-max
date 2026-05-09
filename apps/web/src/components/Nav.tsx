@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { classNames } from "@/lib/format";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 interface NavProps {
   current: string;
@@ -71,6 +72,7 @@ export function Nav({ current }: NavProps) {
               </Link>
             );
           })}
+          <ThemeToggle />
         </nav>
       </div>
     </header>
