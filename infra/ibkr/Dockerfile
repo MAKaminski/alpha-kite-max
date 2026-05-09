@@ -34,10 +34,14 @@ FROM gnzsnz/ib-gateway:stable
 # Railway's private network (port 4002 is not publicly exposed), so widening
 # the allowlist here does not expose the API to the internet.
 #
-# Note: gnzsnz's entrypoint /root/scripts/run.sh is owned by root and is
-# read-only to other users; the wrapper must therefore stay USER root, the
-# same as the upstream image. Java/IB Gateway is launched under the
-# ibgateway user via su/gosu inside run.sh itself.
+# Note: gnzsnz/ib-gateway:stable ends with `USER ibgateway`, so RUN steps
+# in this Dockerfile execute as that unprivileged user by default and
+# cannot write to /usr/local/bin/. Switch to root for the build and stay
+# as root through runtime — gnzsnz's /root/scripts/run.sh is owned by
+# root and not other-readable, so the entrypoint MUST run as root too.
+# Java/IB Gateway is launched under the ibgateway user via su/gosu inside
+# run.sh itself, so end-user code still runs unprivileged.
+USER root
 RUN cat > /usr/local/bin/patch-trusted-ips.sh <<'EOF' && chmod +x /usr/local/bin/patch-trusted-ips.sh
 #!/usr/bin/env bash
 set -euo pipefail
