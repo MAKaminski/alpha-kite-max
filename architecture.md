@@ -133,7 +133,7 @@ CMD ["python", "-m", "services.<name>"]
 
 Three things matter:
 - **Official `astral-sh/uv` base image** — `uv` is preinstalled, dropping the `pip install uv` step (~5–10 s saved per build).
-- **BuildKit cache mount** (`--mount=type=cache,target=/root/.cache/uv`) — survives across builds. Warm rebuilds reuse the uv download cache.
+- **BuildKit cache mount** (`--mount=type=cache,id=s/<railway-service-uuid>-/root/.cache/uv,target=/root/.cache/uv`) — survives across builds. Warm rebuilds reuse the uv download cache. **The `id=` prefix is required on Railway** (`s/<service-uuid>-<target>` format) — without a service-scoped id, multiple services collide on the same cache and Railway builds fail. Get UUIDs via `railway list --json`.
 - **`COPY --link`** — layers stay reusable even when an earlier `COPY` invalidates. Big win on Railway across builds.
 - **Multi-stage** — runtime image holds only the venv + curl + project source. No `build-essential`, no apt cache. Verified: all remaining deps ship cp311 manylinux wheels.
 
@@ -188,17 +188,18 @@ The CI python job's "try prebaked image" step pulls the `lock-<hash>` tag, so a 
 ### Vercel (`apps/web/vercel.json`)
 
 ```json
-{ "buildCommand": "next build", "installCommand": "npm ci --no-audit --no-fund" }
+{ "buildCommand": "next build", "installCommand": "npm install --no-audit --no-fund" }
 ```
 
-`npm ci` is deterministic and marginally faster than `npm install` — that's the only change worth making for Vercel. Vercel already caches `.next/cache` automatically.
+Stock Next.js. Vercel handles caching of `.next/cache` and `node_modules` automatically — leave it alone. Net Vercel-side intervention from this work: zero.
 
-**Two settings to *not* enable for Vercel** (we tried, they regress):
+**Three settings to *not* enable for Vercel** (we tried all three, all regressed):
 
-- `output: 'standalone'` is for self-hosted/Docker deploys. Vercel uses its own Build Output API and ignores `.next/standalone`, but you still pay the file-tracing + node_modules-copy cost during build. Measured: ~50% slower Vercel builds.
-- `next build --turbopack` is fine for `next dev` (HMR) but on Vercel the platform's build cache is tuned for the webpack output shape — switching to Turbopack invalidates large parts of that incremental cache, making warm builds more cold-like.
+- `output: 'standalone'` is for self-hosted/Docker deploys. Vercel uses its own Build Output API and ignores `.next/standalone`, but you still pay the file-tracing + node_modules-copy cost during build. Measured: ~63% slower (38s → 62s).
+- `next build --turbopack` is fine for `next dev` (HMR) but Vercel's build cache is tuned for webpack's output shape — Turbopack invalidates large parts of that cache.
+- `npm ci` instead of `npm install` — looks like a win in theory (deterministic, no resolution work), but Vercel's `node_modules` cache is incremental. `npm install` updates it in place; `npm ci` wipes and reinstalls, defeating Vercel's cache. Measured: ~14s residual after reverting standalone+turbopack went away once `npm ci` also reverted.
 
-Both are appropriate if/when the web app is ever containerized and run outside Vercel.
+All three are appropriate when the web app is containerized and run outside Vercel.
 
 ### Railway (`infra/railway/*.json`)
 

@@ -12,7 +12,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 COPY --link pyproject.toml uv.lock README.md ./
 
-RUN --mount=type=cache,target=/root/.cache/uv \
+RUN --mount=type=cache,id=s/21c9aaf5-d063-49a9-a2e4-641c0029357f-/root/.cache/uv,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-install-project
 
 FROM python:3.11-slim AS runtime
