@@ -33,11 +33,15 @@ FROM gnzsnz/ib-gateway:stable
 # Patch TrustedIPs=* once jts.ini exists. The container is only reachable on
 # Railway's private network (port 4002 is not publicly exposed), so widening
 # the allowlist here does not expose the API to the internet.
+<<<<<<< HEAD
 #
 # Note: gnzsnz's entrypoint /root/scripts/run.sh is owned by root and is
 # read-only to other users; the wrapper must therefore stay USER root, the
 # same as the upstream image. Java/IB Gateway is launched under the
 # ibgateway user via su/gosu inside run.sh itself.
+=======
+USER root
+>>>>>>> origin/main
 RUN cat > /usr/local/bin/patch-trusted-ips.sh <<'EOF' && chmod +x /usr/local/bin/patch-trusted-ips.sh
 #!/usr/bin/env bash
 set -euo pipefail
@@ -48,17 +52,30 @@ for _ in {1..120}; do
       sed -i 's|^TrustedIPs=.*|TrustedIPs=*|' "$JTS_INI"
       echo "[patch-trusted-ips] set TrustedIPs=* in $JTS_INI"
     fi
+<<<<<<< HEAD
+=======
+    # Keep watching: gnzsnz/IBC may rewrite jts.ini on relogin.
+>>>>>>> origin/main
     sleep 5
     continue
   fi
   sleep 1
 done
 EOF
+<<<<<<< HEAD
 
 # Wrap the gnzsnz entrypoint: kick off the patcher in the background, then
 # exec the upstream script. The patcher polls and rewrites jts.ini repeatedly
 # so a daily IBKR-forced relogin (which can regenerate the file) does not
 # silently restore TrustedIPs=127.0.0.1.
+=======
+USER ibgateway
+
+# Wrap the original gnzsnz entrypoint: kick off the patcher in the background,
+# then exec the upstream startup. The patcher polls and rewrites jts.ini
+# repeatedly so a daily IBKR-forced relogin (which can regenerate the file)
+# does not silently restore TrustedIPs=127.0.0.1.
+>>>>>>> origin/main
 ENTRYPOINT ["/bin/bash", "-c", "/usr/local/bin/patch-trusted-ips.sh & exec /root/scripts/run.sh \"$@\"", "--"]
 
 # Paper-trading port. We deliberately do NOT expose 4001 (live).
