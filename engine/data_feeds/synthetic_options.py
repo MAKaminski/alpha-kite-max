@@ -119,8 +119,16 @@ class SyntheticOptionsFeed(BaseFeed):
         sym = symbol.upper()
         if sym in self._last_close:
             return self._last_close[sym]
+        # Match whatever resolution the wrapped feed is loaded for.
+        # SupabaseBarsFeed enforces a strict interval match in
+        # stream_equity_bars (raises ValueError on mismatch), so the
+        # previous hardcoded 60 here 500'd the backtest API any time a
+        # user picked 5m / 1h / 1d in the dashboard. Other feeds
+        # (yfinance, replay, IBKR delayed) default to 60s, so the
+        # fallback preserves their behaviour.
+        interval = getattr(self._equity, "interval_seconds", 60)
         last: Decimal | None = None
-        async for bar in self._equity.stream_equity_bars(sym, 60):
+        async for bar in self._equity.stream_equity_bars(sym, interval):
             last = bar.close
         if last is None:
             raise RuntimeError(
