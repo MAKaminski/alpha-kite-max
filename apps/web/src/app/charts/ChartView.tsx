@@ -118,10 +118,17 @@ export default function ChartView({
       const newMarkers: ChartMarker[] = [];
       for (const r of signalsRes.data ?? []) {
         if (r.direction === "LONG_VOL_UP" || r.direction === "LONG_VOL_DOWN") {
+          const scope =
+            (r.metadata as Record<string, unknown> | null)?.["scope"] as
+              | string
+              | undefined;
+          const isIndicator = scope === "security";
+          const arrow = r.direction === "LONG_VOL_UP" ? "▲" : "▼";
+          const word = r.direction === "LONG_VOL_UP" ? "UP" : "DN";
           newMarkers.push({
             time: Math.floor(new Date(r.ts).getTime() / 1000),
             kind: r.direction === "LONG_VOL_UP" ? "signal_up" : "signal_down",
-            label: r.direction === "LONG_VOL_UP" ? "▲ UP" : "▼ DN",
+            label: isIndicator ? `${arrow} ${word} (ind)` : `${arrow} ${word}`,
             price: null,
           });
         }
