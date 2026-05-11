@@ -30,6 +30,10 @@ class DataConfig(_Strict):
     bar_interval_seconds: int = 60
     options_feed: OptionsFeedName = "synthetic"
     replay_path: str | None = None  # required if feed == replay
+    # IBKR reqMarketDataType: 1=live (requires API-eligible subscription),
+    # 3=delayed (15-min lag, free). Default to delayed so the feed works
+    # out of the box; bump to 1 when you have a real-time API subscription.
+    market_data_type: Literal[1, 2, 3, 4] = 3
 
 
 class BrokerConfig(_Strict):

@@ -45,7 +45,12 @@ def make_feed(
     if feed == "synthetic_options":
         return SyntheticOptionsFeed(_make_yfinance_feed())
     if feed == "ibkr_live":
-        return IBKRLiveFeed(host=ibkr_host, port=ibkr_port, client_id=ibkr_client_id)
+        return IBKRLiveFeed(
+            host=ibkr_host,
+            port=ibkr_port,
+            client_id=ibkr_client_id,
+            market_data_type=config.market_data_type,
+        )
     raise ValueError(f"unknown feed: {feed!r}")  # pragma: no cover - Literal exhaustive
 
 
@@ -69,7 +74,12 @@ def make_options_feed(
         # one IB connection (avoids "duplicate clientId" errors).
         if isinstance(equity_feed, IBKRLiveFeed):
             return equity_feed
-        return IBKRLiveFeed(host=ibkr_host, port=ibkr_port, client_id=ibkr_client_id)
+        return IBKRLiveFeed(
+            host=ibkr_host,
+            port=ibkr_port,
+            client_id=ibkr_client_id,
+            market_data_type=config.market_data_type,
+        )
     raise ValueError(  # pragma: no cover - Literal exhaustive
         f"unknown options_feed: {options_feed!r}"
     )
