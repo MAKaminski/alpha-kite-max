@@ -117,6 +117,32 @@ set -euo pipefail
 echo "[start-with-patcher] pre-run jts.ini contents:"
 cat /home/ibgateway/Jts/jts.ini 2>&1 | sed 's/^/[start-with-patcher]   /' || \
   echo "[start-with-patcher]   (no jts.ini yet)"
+
+# IBC's config.ini is the dialog-auto-dismiss controller. By default
+# AcceptIncomingConnectionAction is empty, which means IB Gateway pops
+# a "Accept incoming connection from X.X.X.X?" dialog for every new
+# API client IP and waits for a human click. In a headless container
+# that blocks forever, so the second API client always times out --
+# which is why market-data-stream's clientId=19 connection fails
+# even though strategy-engine's clientId=18 is healthy.
+#
+# Force AcceptIncomingConnectionAction=accept so IBC auto-dismisses
+# the dialog. gnzsnz writes /home/ibgateway/ibc/config.ini at startup
+# from its own template; we patch the file in-place after it appears.
+IBC_INI=/home/ibgateway/ibc/config.ini
+for _ in {1..30}; do
+  if [ -f "$IBC_INI" ]; then
+    if grep -q '^AcceptIncomingConnectionAction=' "$IBC_INI"; then
+      sed -i 's|^AcceptIncomingConnectionAction=.*|AcceptIncomingConnectionAction=accept|' "$IBC_INI"
+    else
+      echo 'AcceptIncomingConnectionAction=accept' >> "$IBC_INI"
+    fi
+    echo "[start-with-patcher] forced AcceptIncomingConnectionAction=accept in $IBC_INI"
+    break
+  fi
+  sleep 0.2
+done
+
 /usr/local/bin/patch-trusted-ips.sh &
 RUN_SH="$(cat /usr/local/etc/gnzsnz-run-sh.path 2>/dev/null || true)"
 if [ -z "$RUN_SH" ] || [ ! -x "$RUN_SH" ]; then
