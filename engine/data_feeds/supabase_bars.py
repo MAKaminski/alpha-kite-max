@@ -58,6 +58,14 @@ class SupabaseBarsFeed(BaseFeed):
         self._pool: Any | None = None
         self._cached_bars: list[Bar] | None = None
 
+    @property
+    def interval_seconds(self) -> int:
+        """Bar resolution this feed is loaded for. Exposed so wrappers like
+        SyntheticOptionsFeed can match the interval when streaming bars
+        (the feed enforces a strict interval match in stream_equity_bars).
+        """
+        return self._interval
+
     async def _ensure_pool(self) -> Any:
         if self._pool is None:
             import asyncpg
