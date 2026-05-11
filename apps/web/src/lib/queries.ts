@@ -141,10 +141,20 @@ export async function fetchChartMarkers(
     for (const r of signalsRes.data as SignalRowChart[]) {
       const dir = r.direction;
       if (dir === "LONG_VOL_UP" || dir === "LONG_VOL_DOWN") {
+        // Scope tag (set by the live engine on its own writes and by
+        // scripts/backfill_signals.py on historical indicator rows) lets us
+        // visually separate "this is what the strategy actually traded on"
+        // from "this is just where the indicator crossed". Default to
+        // portfolio-scope when the tag is missing so legacy rows keep
+        // their existing look.
+        const scope = (r.metadata?.["scope"] as string | undefined) ?? "portfolio";
+        const isIndicator = scope === "security";
+        const arrow = dir === "LONG_VOL_UP" ? "▲" : "▼";
+        const word = dir === "LONG_VOL_UP" ? "UP" : "DN";
         markers.push({
           time: Math.floor(new Date(r.ts).getTime() / 1000),
           kind: dir === "LONG_VOL_UP" ? "signal_up" : "signal_down",
-          label: dir === "LONG_VOL_UP" ? "▲ UP" : "▼ DN",
+          label: isIndicator ? `${arrow} ${word} (ind)` : `${arrow} ${word}`,
           price: null,
         });
       }

@@ -196,7 +196,7 @@ class BuyVolQQQCrossTickStrategy:
                     direction=direction,
                     timestamp=ctx.now,
                     symbol=self.symbol,
-                    metadata={"sma": str(sma), "vwap": str(vwap)},
+                    metadata={"scope": "portfolio", "sma": str(sma), "vwap": str(vwap)},
                 )
             )
             self._pending = (direction, ctx.now)

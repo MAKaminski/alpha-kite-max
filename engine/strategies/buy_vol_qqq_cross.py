@@ -303,6 +303,7 @@ class BuyVolQQQCrossStrategy:
             timestamp=ctx.now,
             symbol=self.symbol,
             metadata={
+                "scope": "portfolio",
                 "sma": str(sma),
                 "vwap": str(vwap),
                 "close": str(bar.close),
@@ -381,6 +382,7 @@ class BuyVolQQQCrossStrategy:
                     timestamp=ctx.now,
                     symbol=self.symbol,
                     metadata={
+                        "scope": "portfolio",
                         "reason": reason,
                         "entry_mid": str(leg.entry_mid),
                         "exit_mid": str(exit_price),
