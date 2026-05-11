@@ -198,9 +198,12 @@ async def run(cfg: StrategyConfig) -> None:
             feed_connected = True
             LOG.info("equity feed connected: %s", getattr(equity_feed, "name", "?"))
         except Exception as exc:
-            LOG.error("equity feed connect failed: %s — engine will idle", exc)
+            # Use repr so audit captures the exception type even when the
+            # message is empty (e.g. asyncio.TimeoutError has no str repr).
+            LOG.error("equity feed connect failed: %r — engine will idle", exc)
             await _audit(writer, "engine", "FEED_CONNECT_FAILED", "ERROR",
-                         str(exc), payload={"feed": cfg.data.feed})
+                         repr(exc) or type(exc).__name__,
+                         payload={"feed": cfg.data.feed})
 
     await _audit(writer, "engine", "STARTUP", "INFO",
                  f"engine started; feed={cfg.data.feed}", payload={
