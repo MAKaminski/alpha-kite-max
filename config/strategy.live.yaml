@@ -14,6 +14,14 @@ data:
   feed: ibkr_live
   bar_interval_seconds: 60        # ignored when signal.name=sma_vwap_cross_tick
   options_feed: ibkr_live
+  # 1 = live real-time data (requires an API-eligible IBKR market-data
+  #     subscription; without one, IBKR returns Error 420 and zero bars
+  #     flow because reqRealTimeBars is live-only).
+  # 3 = delayed 15-min data (free; works on any IBKR account but no good
+  #     for a near-RT strategy on minute bars).
+  # We've subscribed to API real-time data for QQQ, so use 1 here. Flip
+  # back to 3 temporarily if a subscription lapses or while testing.
+  market_data_type: 1
 
 broker:
   name: ibkr
