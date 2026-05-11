@@ -17,7 +17,7 @@ import logging
 import os
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
 
@@ -184,6 +184,12 @@ async def run_backtest(
     bar_history: list[Bar] = []
     open_records: dict[uuid.UUID, TradeRecord] = {}
     report = Report()
+    # Track the date of the previous bar so we can reset the strategy's
+    # intraday state at session boundaries. Without this, multi-day
+    # backtests carry prior-day bars into VWAP/SMA buffers and crosses
+    # almost never fire after the first day. (See engine.strategies.
+    # buy_vol_qqq_cross.BuyVolQQQCrossStrategy.reset_session for why.)
+    prev_session_date: date | None = None
 
     # When pulling from Supabase, use the caller-supplied interval; for
     # fixtures the value is fixed by the JSON schema.
@@ -193,6 +199,10 @@ async def run_backtest(
     async for bar in feed.stream_equity_bars(
         cfg.universe.symbol, stream_interval
     ):
+        if prev_session_date is not None and bar.open_time.date() != prev_session_date:
+            strategy.reset_session()
+        prev_session_date = bar.open_time.date()
+
         bar_history.append(bar)
 
         chain = await options_feed.get_option_chain(

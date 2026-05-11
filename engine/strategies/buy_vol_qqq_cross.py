@@ -137,6 +137,20 @@ class BuyVolQQQCrossStrategy:
         self._prev_diff: Decimal | None = None
         self._open_legs: dict[tuple[str, str, str, str], _OpenLeg] = {}
 
+    def reset_session(self) -> None:
+        """Drop intraday state at the start of a new trading session.
+
+        Session VWAP and the SMA/VWAP cross detector depend on intraday
+        bars only -- when replaying multi-day data (Supabase-bars backtest
+        or the live engine across midnight) the caller must invoke this
+        on each session boundary, otherwise prior-day bars contaminate
+        VWAP and crosses stop firing. Open positions in _open_legs are
+        intentionally preserved; the caller decides whether to flatten
+        them across sessions.
+        """
+        self._bars.clear()
+        self._prev_diff = None
+
     # ------------------------------------------------------------------ helpers
 
     @staticmethod
