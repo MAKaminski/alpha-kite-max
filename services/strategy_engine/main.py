@@ -286,7 +286,7 @@ async def run(cfg: StrategyConfig) -> None:
                         "account_id": acct.account_id,
                         "broker_mode": cfg.broker.mode,
                         "dry_run": effective_dry_run,
-                        "nav": str(acct.nav),
+                        "nav": str(acct.net_liquidation),
                         "cash": str(acct.cash),
                         "buying_power": str(acct.buying_power),
                         "connected": True,
