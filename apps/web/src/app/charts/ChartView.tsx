@@ -84,6 +84,7 @@ export default function ChartView({
           .from("bars")
           .select("symbol,open_time,open,high,low,close,volume,vwap")
           .eq("symbol", symbol)
+          .eq("interval_seconds", 60)
           .gte("open_time", startIso)
           .lte("open_time", endIso)
           .order("open_time", { ascending: true }),

@@ -86,10 +86,15 @@ export async function fetchChartBars(
   if (!supabase) return [];
   const dayStart = `${day}T00:00:00Z`;
   const dayEnd = `${day}T23:59:59Z`;
+  // bars table holds multiple intervals (1m / 5m / 1h / 1d) -- both the
+  // live market-data-stream and the backfill script write rows. The chart
+  // is a 1-minute intraday view, so filter to interval_seconds=60 or the
+  // result is an interleaved mess of timeframes.
   const { data, error } = await supabase
     .from("bars")
     .select("symbol,open_time,open,high,low,close,volume,vwap")
     .eq("symbol", symbol)
+    .eq("interval_seconds", 60)
     .gte("open_time", dayStart)
     .lte("open_time", dayEnd)
     .order("open_time", { ascending: true });
@@ -801,9 +806,12 @@ export interface RecentBar {
 export async function fetchRecentBars(limit = 10): Promise<RecentBar[]> {
   const supabase = getSupabase();
   if (!supabase) return [];
+  // Filter to 1-minute bars so /status's "Live feed" doesn't get a mix
+  // of 1m / 5m / 1h / 1d rows after the backfill script runs.
   const { data, error } = await supabase
     .from("bars")
     .select("symbol,open_time,close,volume")
+    .eq("interval_seconds", 60)
     .order("open_time", { ascending: false })
     .limit(limit);
   if (error || !data) return [];
