@@ -24,7 +24,7 @@ import logging
 from collections.abc import AsyncIterator
 from datetime import UTC, date, datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, ClassVar
 
 from contracts.data_feed import (
     Bar,
@@ -69,6 +69,24 @@ class IBKRLiveFeed(BaseFeed):
     # you have a real API-eligible streaming subscription.
     MARKET_DATA_TYPE_LIVE: int = 1
     MARKET_DATA_TYPE_DELAYED: int = 3
+    # Market-data routing: SMART picks an arbitrary ATS (e.g. ISLAND for
+    # NASDAQ-listed names), and IBKR's per-ATS subscription check rejects
+    # the request unless you've paid for that specific venue's depth.
+    # Forcing the primary listing exchange targets the consolidated tape
+    # which the "US Equity and Options Add-On Streaming Bundle (NP)"
+    # subscription covers for NYSE/AMEX/NASDAQ. Order placement (in
+    # ibkr_paper.py) stays SMART for best execution -- only the
+    # market-data subscription is venue-sensitive.
+    PRIMARY_EXCHANGE: ClassVar[dict[str, str]] = {
+        "QQQ": "NASDAQ",
+        "SPY": "ARCA",
+        "IWM": "ARCA",
+        "DIA": "ARCA",
+    }
+
+    @classmethod
+    def _market_data_exchange(cls, symbol: str) -> str:
+        return cls.PRIMARY_EXCHANGE.get(symbol.upper(), "SMART")
 
     def __init__(
         self,
@@ -123,7 +141,7 @@ class IBKRLiveFeed(BaseFeed):
         except ImportError as exc:  # pragma: no cover
             raise RuntimeError("ib_insync is required for IBKRLiveFeed") from exc
 
-        contract = Stock(sym, "SMART", "USD")
+        contract = Stock(sym, self._market_data_exchange(sym), "USD")
         ticker = ib.reqMktData(contract, "", False, False)
         try:
             while True:
@@ -158,7 +176,7 @@ class IBKRLiveFeed(BaseFeed):
         except ImportError as exc:  # pragma: no cover
             raise RuntimeError("ib_insync is required for IBKRLiveFeed") from exc
 
-        contract = Stock(sym, "SMART", "USD")
+        contract = Stock(sym, self._market_data_exchange(sym), "USD")
         bars = ib.reqRealTimeBars(contract, 5, "TRADES", False)
         agg_seconds = max(interval_seconds, 5)
         ratio = agg_seconds // 5
@@ -212,7 +230,7 @@ class IBKRLiveFeed(BaseFeed):
             raise RuntimeError("ib_insync is required for IBKRLiveFeed") from exc
 
         # Get the underlying contract id needed by reqSecDefOptParams
-        underlying_contract = Stock(sym, "SMART", "USD")
+        underlying_contract = Stock(sym, self._market_data_exchange(sym), "USD")
         await ib.qualifyContractsAsync(underlying_contract)
         params_list = await ib.reqSecDefOptParamsAsync(
             underlying_contract.symbol, "", "STK", underlying_contract.conId
