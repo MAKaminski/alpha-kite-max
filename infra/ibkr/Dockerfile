@@ -118,26 +118,37 @@ echo "[start-with-patcher] pre-run jts.ini contents:"
 cat /home/ibgateway/Jts/jts.ini 2>&1 | sed 's/^/[start-with-patcher]   /' || \
   echo "[start-with-patcher]   (no jts.ini yet)"
 
-# IBC's config.ini is the dialog-auto-dismiss controller. By default
-# AcceptIncomingConnectionAction is empty, which means IB Gateway pops
-# a "Accept incoming connection from X.X.X.X?" dialog for every new
-# API client IP and waits for a human click. In a headless container
-# that blocks forever, so the second API client always times out --
-# which is why market-data-stream's clientId=19 connection fails
-# even though strategy-engine's clientId=18 is healthy.
+# IBC's config.ini controls two things we care about:
 #
-# Force AcceptIncomingConnectionAction=accept so IBC auto-dismisses
-# the dialog. gnzsnz writes /home/ibgateway/ibc/config.ini at startup
-# from its own template; we patch the file in-place after it appears.
+# 1. AcceptIncomingConnectionAction -- when empty (gnzsnz's default),
+#    IB Gateway pops a "Accept incoming connection from X.X.X.X?"
+#    dialog for every new API client IP and waits for a human click.
+#    In a headless container that blocks. Setting "accept" auto-clicks
+#    Yes.
+#
+# 2. TrustedTwsApiClientIPs -- when empty, IBC defaults the gateway's
+#    TrustedIPs to just 127.0.0.1, blocking everything from Railway's
+#    private network. IBC's own docs say setting this to "0.0.0.0"
+#    allows connections from any IP. The wildcard "*" gets validated
+#    and rewritten back to 127.0.0.1; "0.0.0.0" is the documented
+#    "allow all" sentinel that survives IBC's validation.
+#
+# gnzsnz writes config.ini at startup from its own template. We patch
+# the file in-place after it appears but before gnzsnz exec's IBC.
 IBC_INI=/home/ibgateway/ibc/config.ini
+_ibc_force_setting() {
+  local key="$1" val="$2"
+  if grep -q "^${key}=" "$IBC_INI"; then
+    sed -i "s|^${key}=.*|${key}=${val}|" "$IBC_INI"
+  else
+    echo "${key}=${val}" >> "$IBC_INI"
+  fi
+  echo "[start-with-patcher] forced ${key}=${val} in $IBC_INI"
+}
 for _ in {1..30}; do
   if [ -f "$IBC_INI" ]; then
-    if grep -q '^AcceptIncomingConnectionAction=' "$IBC_INI"; then
-      sed -i 's|^AcceptIncomingConnectionAction=.*|AcceptIncomingConnectionAction=accept|' "$IBC_INI"
-    else
-      echo 'AcceptIncomingConnectionAction=accept' >> "$IBC_INI"
-    fi
-    echo "[start-with-patcher] forced AcceptIncomingConnectionAction=accept in $IBC_INI"
+    _ibc_force_setting AcceptIncomingConnectionAction accept
+    _ibc_force_setting TrustedTwsApiClientIPs 0.0.0.0
     break
   fi
   sleep 0.2
