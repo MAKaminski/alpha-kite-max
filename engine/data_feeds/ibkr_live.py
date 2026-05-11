@@ -24,7 +24,7 @@ import logging
 from collections.abc import AsyncIterator
 from datetime import UTC, date, datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, ClassVar
 
 from contracts.data_feed import (
     Bar,
@@ -68,7 +68,7 @@ class IBKRLiveFeed(BaseFeed):
     # subscription covers for NYSE/AMEX/NASDAQ. Order placement (in
     # ibkr_paper.py) stays SMART for best execution -- only the
     # market-data subscription is venue-sensitive.
-    PRIMARY_EXCHANGE: dict[str, str] = {
+    PRIMARY_EXCHANGE: ClassVar[dict[str, str]] = {
         "QQQ": "NASDAQ",
         "SPY": "ARCA",
         "IWM": "ARCA",
