@@ -73,8 +73,10 @@ async def run(cfg: StrategyConfig) -> None:
             await feed.connect()
             feed_connected = True
         except Exception as exc:
-            LOG.error("feed connect failed: %s — heartbeat-only mode", exc)
-            await _audit("FEED_CONNECT_FAILED", "ERROR", str(exc))
+            # Use repr so audit captures the exception type even when the
+            # message is empty (e.g. asyncio.TimeoutError has no str repr).
+            LOG.error("feed connect failed: %r — heartbeat-only mode", exc)
+            await _audit("FEED_CONNECT_FAILED", "ERROR", repr(exc) or type(exc).__name__)
 
     await _audit("STARTUP", "INFO", "market-data stream started")
 
