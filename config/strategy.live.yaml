@@ -19,7 +19,14 @@ broker:
   name: ibkr
   mode: paper
   host: ibkr-gateway.railway.internal   # Railway private DNS
-  port: 4002                             # IB Gateway paper port (gnzsnz image)
+  # gnzsnz/ib-gateway runs IB Gateway on port 4002 (the API itself, bound
+  # to all interfaces) AND socat on port 4004 (which forwards to localhost:4002).
+  # If we connect to 4002 directly we hit the gateway with the client's
+  # actual source IP -- the gateway then fails its TrustedIPs check and
+  # closes the connection 1ms after accept. Connecting to 4004 routes
+  # through socat, so the gateway sees 127.0.0.1 as the source IP and
+  # the TrustedIPs check passes.
+  port: 4004                             # SOCAT_PORT (proxy to localhost:4002)
   client_id: 17
   dry_run: true                          # KEEP TRUE during the first session
   # IBKR paper accounts start with DU; the existing PaperAccountGuard already
