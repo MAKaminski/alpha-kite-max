@@ -57,18 +57,30 @@ class IBKRLiveFeed(BaseFeed):
 
     name: str = "ibkr_live"
 
-    LIVE_MARKET_DATA_TYPE: int = 1   # 1=live, 2=frozen, 3=delayed, 4=delayed-frozen
     GENERIC_TICK_GREEKS: str = "106"  # OptionImpliedVolatility + Greeks
+
+    # reqMarketDataType values per IBKR API:
+    #   1 = live (requires API-eligible market-data subscription)
+    #   2 = frozen (last live snapshot, no updates)
+    #   3 = delayed (15-min lag, free; works when no live subscription)
+    #   4 = delayed-frozen
+    # We default to 3 so the feed works out of the box for IBKR paper
+    # accounts and lite plans. Override via cfg.data.market_data_type when
+    # you have a real API-eligible streaming subscription.
+    MARKET_DATA_TYPE_LIVE: int = 1
+    MARKET_DATA_TYPE_DELAYED: int = 3
 
     def __init__(
         self,
         host: str = "127.0.0.1",
         port: int = 7497,
         client_id: int = 17,
+        market_data_type: int = MARKET_DATA_TYPE_DELAYED,
     ) -> None:
         self._host = host
         self._port = port
         self._client_id = client_id
+        self._market_data_type = market_data_type
         self._ib: Any = None
         self._connected: bool = False
         self._data_type_returned: int | None = None
@@ -83,11 +95,11 @@ class IBKRLiveFeed(BaseFeed):
 
         self._ib = IB()
         await self._ib.connectAsync(self._host, self._port, clientId=self._client_id)
-        self._ib.reqMarketDataType(self.LIVE_MARKET_DATA_TYPE)
+        self._ib.reqMarketDataType(self._market_data_type)
         self._connected = True
         logger.info(
             "IBKRLiveFeed connected to %s:%s (clientId=%s, mktDataType=%s)",
-            self._host, self._port, self._client_id, self.LIVE_MARKET_DATA_TYPE,
+            self._host, self._port, self._client_id, self._market_data_type,
         )
 
     async def disconnect(self) -> None:
