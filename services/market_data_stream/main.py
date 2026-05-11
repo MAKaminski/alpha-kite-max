@@ -35,7 +35,16 @@ def _build_storage() -> StorageBackend:
 async def run(cfg: StrategyConfig) -> None:
     LOG.info("starting market-data stream; feed=%s symbol=%s",
              cfg.data.feed, cfg.universe.symbol)
-    feed = make_feed(cfg.data)
+    # Feed and the strategy-engine's broker/feed share the same IB Gateway
+    # endpoint, so we forward cfg.broker.host/port. Each IBKR client needs
+    # a distinct clientId on the same gateway: broker=cfg.broker.client_id,
+    # engine feed=client_id+1, market-data-stream feed=client_id+2.
+    feed = make_feed(
+        cfg.data,
+        ibkr_host=cfg.broker.host,
+        ibkr_port=cfg.broker.port,
+        ibkr_client_id=cfg.broker.client_id + 2,
+    )
     writer = PersistenceWriter(_build_storage())
 
     stop_event = asyncio.Event()
