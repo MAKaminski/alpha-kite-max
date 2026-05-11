@@ -90,22 +90,63 @@ RUN chown -R ibgateway:ibgateway /home/ibgateway/Jts && \
 
 RUN cat > /usr/local/bin/patch-trusted-ips.sh <<'EOF' && chmod +x /usr/local/bin/patch-trusted-ips.sh
 #!/usr/bin/env bash
-# Belt-and-braces: keep watching jts.ini and re-apply TrustedIPs=* if a
-# daily IBKR-forced relogin or some unexpected codepath ever rewrites the
-# file with the old value. The build-time pre-bake handles the common
-# path; this watcher is just a safety net.
+# Aggressive background watcher: keep jts.ini and IBC's config.ini set
+# to the values we want. Necessary because gnzsnz's run.sh writes both
+# files AFTER our pre-startup patch in start-with-patcher.sh and BEFORE
+# IBC reads them, silently clobbering our values. We need to repatch
+# fast enough to win the race against IBC's startup config-read.
+#
+# Poll at 50 ms for the first 60 s, then back off to 5 s as a safety net.
 set -euo pipefail
 JTS_INI=/home/ibgateway/Jts/jts.ini
-for _ in {1..120}; do
+IBC_INI=/home/ibgateway/ibc/config.ini
+
+_force_jts_trustedips() {
   if [ -f "$JTS_INI" ] && grep -q '^TrustedIPs=' "$JTS_INI"; then
     if ! grep -q '^TrustedIPs=\*' "$JTS_INI"; then
       sed -i 's|^TrustedIPs=.*|TrustedIPs=*|' "$JTS_INI"
       echo "[patch-trusted-ips] re-set TrustedIPs=* in $JTS_INI"
     fi
-    sleep 5
-    continue
   fi
-  sleep 1
+}
+
+_force_ibc_trusted_clients() {
+  [ -f "$IBC_INI" ] || return 0
+  if grep -q '^TrustedTwsApiClientIPs=' "$IBC_INI"; then
+    if ! grep -q '^TrustedTwsApiClientIPs=0\.0\.0\.0' "$IBC_INI"; then
+      sed -i 's|^TrustedTwsApiClientIPs=.*|TrustedTwsApiClientIPs=0.0.0.0|' "$IBC_INI"
+      echo "[patch-trusted-ips] re-set TrustedTwsApiClientIPs=0.0.0.0 in $IBC_INI"
+    fi
+  else
+    echo 'TrustedTwsApiClientIPs=0.0.0.0' >> "$IBC_INI"
+    echo "[patch-trusted-ips] appended TrustedTwsApiClientIPs=0.0.0.0 to $IBC_INI"
+  fi
+  if grep -q '^AcceptIncomingConnectionAction=' "$IBC_INI"; then
+    if ! grep -q '^AcceptIncomingConnectionAction=accept' "$IBC_INI"; then
+      sed -i 's|^AcceptIncomingConnectionAction=.*|AcceptIncomingConnectionAction=accept|' "$IBC_INI"
+      echo "[patch-trusted-ips] re-set AcceptIncomingConnectionAction=accept in $IBC_INI"
+    fi
+  else
+    echo 'AcceptIncomingConnectionAction=accept' >> "$IBC_INI"
+    echo "[patch-trusted-ips] appended AcceptIncomingConnectionAction=accept to $IBC_INI"
+  fi
+}
+
+# Tight loop for the first 60 s -- this is where the race with IBC's
+# startup read happens.
+end=$(( $(date +%s) + 60 ))
+while [ "$(date +%s)" -lt "$end" ]; do
+  _force_jts_trustedips
+  _force_ibc_trusted_clients
+  sleep 0.05
+done
+
+# After IBC is up, slow-poll as a safety net for relogins that
+# regenerate the files.
+while true; do
+  _force_jts_trustedips
+  _force_ibc_trusted_clients
+  sleep 5
 done
 EOF
 
