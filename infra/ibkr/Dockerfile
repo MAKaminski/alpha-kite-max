@@ -102,12 +102,16 @@ JTS_INI=/home/ibgateway/Jts/jts.ini
 IBC_INI=/home/ibgateway/ibc/config.ini
 
 _force_jts_trustedips() {
-  if [ -f "$JTS_INI" ] && grep -q '^TrustedIPs=' "$JTS_INI"; then
-    if ! grep -q '^TrustedIPs=\*' "$JTS_INI"; then
-      sed -i 's|^TrustedIPs=.*|TrustedIPs=*|' "$JTS_INI"
-      echo "[patch-trusted-ips] re-set TrustedIPs=* in $JTS_INI"
-    fi
-  fi
+  # IBC validates jts.ini's TrustedIPs and rewrites invalid values to
+  # 127.0.0.1. With our TrustedTwsApiClientIPs=0.0.0.0 in config.ini,
+  # IBC writes TrustedIPs=127.0.0.1,0.0.0.0 which is a VALID value
+  # ("0.0.0.0" is IBC's documented sentinel for allow-all). Earlier
+  # this watcher overwrote IBC's good value with `*` -- which IBC then
+  # had to rewrite to 127.0.0.1 again, and may have left the file in
+  # an invalid state while the gateway was reading it (Java loaded `*`,
+  # treated it as no-match, never opened the API socket). Just leave
+  # IBC's value alone; no patching needed here.
+  return 0
 }
 
 _force_ibc_trusted_clients() {
