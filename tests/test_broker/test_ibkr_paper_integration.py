@@ -230,15 +230,27 @@ async def test_place_and_cancel_open_limit_order(live_broker: IBKRPaperBroker) -
     """
     from ib_insync import Stock  # type: ignore[import-not-found]
 
-    # Use the underlying's last price to size the deep-OTM limit.
+    # Use the underlying's last price to size the deep-OTM limit. If the
+    # IBKR account doesn't have a market-data subscription (error 10089),
+    # ticker.last comes back as NaN — Decimal('NaN') is truthy AND parses
+    # successfully, so we have to detect NaN explicitly and fall back to
+    # a sane default price.
     contract = Stock("QQQ", "SMART", "USD")
     ticker = live_broker.ib.reqMktData(contract, "", False, False)
-    # Wait briefly for a quote.
     for _ in range(20):
         await asyncio.sleep(0.25)
         if ticker.last and str(ticker.last).lower() != "nan":
             break
-    last_price = Decimal(str(ticker.last)) if ticker.last else Decimal("450")
+    last_price = Decimal("450")  # safe fallback ~ QQQ neighborhood
+    if ticker.last:
+        raw = str(ticker.last)
+        if raw.lower() != "nan":
+            try:
+                parsed = Decimal(raw)
+                if parsed.is_finite():
+                    last_price = parsed
+            except Exception:
+                pass
     live_broker.ib.cancelMktData(contract)
 
     intent = _equity_buy_limit_deep_otm(last_price)
