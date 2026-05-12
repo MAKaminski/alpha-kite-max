@@ -213,7 +213,11 @@ async def test_order_intent_persists_to_supabase(
     Supabase, query it back, assert every field round-trips."""
     backend, writer, _ = supabase
 
-    # Pull a last-price quote so the limit is properly OTM.
+    # Pull a last-price quote so the limit is properly OTM. Without a
+    # market-data subscription (IBKR error 10089), ticker.last comes back
+    # as Decimal('NaN') — which is truthy AND parses, so the simple
+    # ``else`` fallback never fires and pydantic later rejects the NaN
+    # limit_price. Detect NaN explicitly and fall back to a sane default.
     from ib_insync import Stock  # type: ignore[import-not-found]
     contract = Stock("QQQ", "SMART", "USD")
     ticker = live_broker.ib.reqMktData(contract, "", False, False)
@@ -221,7 +225,16 @@ async def test_order_intent_persists_to_supabase(
         await asyncio.sleep(0.25)
         if ticker.last and str(ticker.last).lower() != "nan":
             break
-    last_price = Decimal(str(ticker.last)) if ticker.last else Decimal("450")
+    last_price = Decimal("450")  # safe fallback ~ QQQ neighborhood
+    if ticker.last:
+        raw = str(ticker.last)
+        if raw.lower() != "nan":
+            try:
+                parsed = Decimal(raw)
+                if parsed.is_finite():
+                    last_price = parsed
+            except Exception:
+                pass
     live_broker.ib.cancelMktData(contract)
 
     intent = _deep_otm_buy(last_price, tag=test_run_id)
