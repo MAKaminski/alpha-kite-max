@@ -126,8 +126,19 @@ class IBKRPaperBroker(AbstractBroker):
             await result
 
         try:
-            summary = self.ib.accountSummary()
-            if asyncio.iscoroutine(summary):  # pragma: no cover - defensive
+            # ib_insync's sync ``accountSummary()`` calls ``util.run`` which
+            # tries to spin up its own event loop — that conflicts with the
+            # asyncio loop we're already in and raises
+            # "This event loop is already running". Use the async variant
+            # so we cooperate with the current loop. The fake _FakeIB used
+            # by unit tests returns a plain list from its sync method, so
+            # we accept either shape.
+            summary_call = getattr(self.ib, "accountSummaryAsync", None)
+            if summary_call is None:
+                summary = self.ib.accountSummary()
+            else:
+                summary = summary_call()
+            if asyncio.iscoroutine(summary):
                 summary = await summary
         except Exception as exc:  # pragma: no cover - depends on IB
             logger.exception("ibkr accountSummary() failed")
@@ -263,8 +274,13 @@ class IBKRPaperBroker(AbstractBroker):
                 update={"account_id": self._account_id or inner.account_id}
             )
 
-        summary = self.ib.accountSummary()
-        if asyncio.iscoroutine(summary):  # pragma: no cover - defensive
+        # See note in connect() — prefer the async variant.
+        summary_call = getattr(self.ib, "accountSummaryAsync", None)
+        if summary_call is None:
+            summary = self.ib.accountSummary()
+        else:
+            summary = summary_call()
+        if asyncio.iscoroutine(summary):
             summary = await summary
         rows = list(summary or [])
 
