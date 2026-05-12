@@ -122,8 +122,8 @@ async def _run_one_interval(
             sig_counts = await backfill_signals.run(
                 symbol=symbol,
                 interval_seconds=interval_seconds,
-                start_dt=start_dt,
-                end_dt=end_dt,
+                start=start_dt,
+                end=end_dt,
                 sma_period=sma_period,
             )
             LOG.info(
