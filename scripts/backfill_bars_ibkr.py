@@ -190,7 +190,11 @@ async def run(
 
     ib = IB()
     LOG.info("connecting to IBKR at %s:%s (clientId=%s)", host, port, client_id)
-    await ib.connectAsync(host, port, clientId=client_id)
+    # 30s timeout (default is 4s) — handles public-proxy round-trip latency.
+    # Each IBKR handshake step (version, startApi, managedAccounts,
+    # nextValidId) is a separate round trip; over the internet via Railway's
+    # TCP proxy that easily exceeds 4 s before apiStart fires.
+    await ib.connectAsync(host, port, clientId=client_id, timeout=30)
     LOG.info("connected; pulling %s bars for %s back to %s",
              spec.bar_size, symbol, start_dt.isoformat())
 
