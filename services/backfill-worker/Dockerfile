@@ -29,14 +29,20 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app \
     PATH="/app/.venv/bin:$PATH"
 
-COPY --link --from=builder /app/.venv /app/.venv
+COPY --from=builder /app/.venv /app/.venv
 
 WORKDIR /app
-COPY --link contracts ./contracts
-COPY --link config ./config
-COPY --link engine ./engine
-COPY --link services ./services
-COPY --link scripts ./scripts
+# Drop --link on app-source COPYs: Railway's BuildKit fork has been serving
+# stale cached layers even when content changed (PR #45's fix to
+# backfill_runner.py was on origin/main but the deployed image kept the
+# pre-fix version). Plain COPY rebuilds these layers every time, which is
+# cheap (these dirs total <1 MB) and rules out a class of "why is old code
+# running" debugging.
+COPY contracts ./contracts
+COPY config ./config
+COPY engine ./engine
+COPY services ./services
+COPY scripts ./scripts
 
 # No healthcheck — this is a one-shot worker. Railway's restartPolicyType
 # is set to NEVER in the service config so a clean exit doesn't trigger a

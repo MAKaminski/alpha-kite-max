@@ -149,6 +149,27 @@ async def main_async() -> None:
     port = _env_int("IBKR_PORT", 4004)
     client_id = _env_int("IBKR_CLIENT_ID_BACKFILL", 99)
 
+    # Startup probe: if you see this line in the logs you know the new image
+    # actually deployed (vs. Railway serving a cached layer with stale code).
+    LOG.info("backfill_runner build marker: signals-kwargs=start/end DNS-probe=on")
+
+    # DNS sanity check — call getaddrinfo for the configured IBKR host so we
+    # surface "Outbound IPv6 toggle off" or "Private Networking off" before
+    # we try to actually connect. Private Railway DNS returns AAAA records
+    # only; without IPv6 outbound enabled this raises gaierror.
+    try:
+        import socket
+        infos = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+        LOG.info(
+            "DNS probe ok: %s resolves to %s",
+            host, [a[4][0] for a in infos[:4]],
+        )
+    except Exception as exc:
+        LOG.error(
+            "DNS probe FAILED for %s:%d (%s) — check Railway Private Networking + Outbound IPv6 toggles",
+            host, port, exc,
+        )
+
     LOG.info(
         "starting backfill: symbol=%s intervals=%s years=%.1f sma=%d "
         "ibkr=%s:%d skip_bars=%s skip_signals=%s",
