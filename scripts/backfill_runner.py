@@ -138,6 +138,39 @@ async def _run_one_interval(
                  interval_seconds)
 
 
+def _tcp_probe(host: str, port: int, timeout_s: float = 3.0) -> None:
+    """Attempt a raw TCP connect to each AF_INET/AF_INET6 result that
+    getaddrinfo returns for (host, port), with a tight per-attempt timeout.
+    Logs the outcome of every individual attempt so we can see which IP
+    family is actually reachable from this container.
+    """
+    import socket
+    try:
+        candidates = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    except Exception as exc:
+        LOG.error("TCP probe — getaddrinfo(%s:%d) failed: %s", host, port, exc)
+        return
+    for family, _stype, _proto, _canon, sockaddr in candidates:
+        fam_name = "IPv6" if family == socket.AF_INET6 else "IPv4"
+        addr = sockaddr[0]
+        sock = socket.socket(family, socket.SOCK_STREAM)
+        sock.settimeout(timeout_s)
+        try:
+            sock.connect(sockaddr)
+            LOG.info("TCP probe ok: %s/%s:%d (%s) connected", fam_name, addr, port, host)
+        except TimeoutError:
+            LOG.error("TCP probe TIMEOUT: %s/%s:%d (%s) — packet sent, no SYN-ACK in %ss",
+                      fam_name, addr, port, host, timeout_s)
+        except ConnectionRefusedError:
+            LOG.error("TCP probe REFUSED: %s/%s:%d (%s) — nothing listening",
+                      fam_name, addr, port, host)
+        except OSError as exc:
+            LOG.error("TCP probe OSError: %s/%s:%d (%s) — %s",
+                      fam_name, addr, port, host, exc)
+        finally:
+            sock.close()
+
+
 async def main_async() -> None:
     symbol = os.getenv("BACKFILL_SYMBOL", "QQQ")
     intervals = _parse_intervals(os.getenv("BACKFILL_INTERVALS", "60 300 3600 86400"))
@@ -151,14 +184,14 @@ async def main_async() -> None:
 
     # Startup probe: if you see this line in the logs you know the new image
     # actually deployed (vs. Railway serving a cached layer with stale code).
-    LOG.info("backfill_runner build marker: signals-kwargs=start/end DNS-probe=on")
+    LOG.info("backfill_runner build marker: signals-kwargs=start/end DNS-probe=on net-probe=v2")
 
     # DNS sanity check — call getaddrinfo for the configured IBKR host so we
     # surface "Outbound IPv6 toggle off" or "Private Networking off" before
     # we try to actually connect. Private Railway DNS returns AAAA records
     # only; without IPv6 outbound enabled this raises gaierror.
+    import socket
     try:
-        import socket
         infos = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
         LOG.info(
             "DNS probe ok: %s resolves to %s",
@@ -169,6 +202,13 @@ async def main_async() -> None:
             "DNS probe FAILED for %s:%d (%s) — check Railway Private Networking + Outbound IPv6 toggles",
             host, port, exc,
         )
+
+    # Layered TCP-connect probe — DNS passes but the actual connect times
+    # out, so this tries each resolved family separately + a couple of
+    # alternative ports to pinpoint *exactly* which path is broken. Each
+    # attempt has a 3-second timeout and logs its specific result.
+    _tcp_probe(host, port)
+    _tcp_probe(host, 4002)  # gateway's internal listen port (pre-socat)
 
     LOG.info(
         "starting backfill: symbol=%s intervals=%s years=%.1f sma=%d "
