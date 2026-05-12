@@ -246,6 +246,17 @@ class IBKRPaperBroker(AbstractBroker):
 
     @classmethod
     def _classify_account_type(cls, summary: list[Any]) -> AccountType:
+        # 1) The DU* account-id convention is the most reliable signal IBKR
+        #    gives us. Real paper accounts always start with DU (or DUM in
+        #    newer testbeds like DUM428671). The AccountType tag for a paper
+        #    account is often the parent account's type ("INDIVIDUAL",
+        #    "JOINT", etc.) which by itself would mis-classify as LIVE, so
+        #    we check the id prefix first.
+        account_id = cls._extract_account_id(summary) or ""
+        if account_id.upper().startswith(_PAPER_PREFIX):
+            return AccountType.PAPER
+
+        # 2) Otherwise consult the AccountType / AccountCode tags.
         for row in summary:
             tag = cls._row_attr(row, "tag", "")
             value = str(cls._row_attr(row, "value", "")).upper()
@@ -256,10 +267,6 @@ class IBKRPaperBroker(AbstractBroker):
                     if value in {"INDIVIDUAL", "JOINT", "TRUST", "IRA", "CORP", "LIVE"}:
                         return AccountType.LIVE
                     return AccountType.LIVE
-        # Fall back to the account-id convention.
-        account_id = cls._extract_account_id(summary) or ""
-        if account_id.upper().startswith(_PAPER_PREFIX):
-            return AccountType.PAPER
         return AccountType.UNKNOWN
 
     # ------------------------------------------------------------------
