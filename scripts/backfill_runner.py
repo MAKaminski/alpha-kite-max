@@ -184,7 +184,7 @@ async def main_async() -> None:
 
     # Startup probe: if you see this line in the logs you know the new image
     # actually deployed (vs. Railway serving a cached layer with stale code).
-    LOG.info("backfill_runner build marker: signals-kwargs=start/end DNS-probe=on net-probe=v2")
+    LOG.info("backfill_runner build marker: connect-timeout=30s net-probe=v2")
 
     # DNS sanity check — call getaddrinfo for the configured IBKR host so we
     # surface "Outbound IPv6 toggle off" or "Private Networking off" before
