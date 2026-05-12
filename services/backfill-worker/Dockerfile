@@ -15,8 +15,12 @@ WORKDIR /app
 
 COPY --link pyproject.toml uv.lock README.md ./
 
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --no-install-project
+# Railway's BuildKit fork requires `id=` on every --mount=type=cache. The
+# alternative is to thread a service-scoped cache key (like the existing
+# strategy-engine Dockerfile does); since this is a one-shot worker that
+# builds at most a handful of times we skip the cache entirely — the uv
+# install is ~10s on a cold cache, not worth the Railway-specific syntax.
+RUN uv sync --frozen --no-dev --no-install-project
 
 FROM python:3.11-slim AS runtime
 
